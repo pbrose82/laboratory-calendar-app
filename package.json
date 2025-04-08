@@ -1,8 +1,8 @@
 {
   "name": "laboratory-calendar-app",
   "version": "1.0.0",
-  "homepage": ".",
   "private": true,
+  "homepage": ".",
   "dependencies": {
     "@fullcalendar/daygrid": "^6.1.11",
     "@fullcalendar/interaction": "^6.1.11",
