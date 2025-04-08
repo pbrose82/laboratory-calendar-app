@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react'; // Remove useState import
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -6,13 +6,10 @@ import interactionPlugin from '@fullcalendar/interaction';
 import { laboratoryEvents, laboratoryResources } from '../data/sample-events';
 
 function LaboratoryCalendar() {
-  const [events, setEvents] = useState(laboratoryEvents);
-
-  // Handle date click to add new event
   const handleDateClick = (selectInfo) => {
     const title = prompt('Please enter a new event title:');
     const calendarApi = selectInfo.view.calendar;
-    calendarApi.unselect(); // clear date selection
+    calendarApi.unselect();
 
     if (title) {
       calendarApi.addEvent({
@@ -24,12 +21,10 @@ function LaboratoryCalendar() {
     }
   };
 
-  // Handle event click to show details
   const handleEventClick = (clickInfo) => {
     const event = clickInfo.event;
     const extendedProps = event.extendedProps;
 
-    // Custom modal or alert with event details
     alert(`
       Event Details:
       Title: ${event.title}
@@ -59,7 +54,7 @@ function LaboratoryCalendar() {
         dayMaxEvents={true}
         dateClick={handleDateClick}
         eventClick={handleEventClick}
-        events={events}
+        events={laboratoryEvents}
         resources={laboratoryResources}
       />
     </div>
