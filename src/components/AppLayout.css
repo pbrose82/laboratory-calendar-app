@@ -1,7 +1,7 @@
 /* AppLayout.css - Styles for the layout with left navigation */
 
 :root {
-  --primary-color: #0052CC; /* Adjusted to match screenshot color */
+  --primary-color: #1565C0; /* Adjusted to match screenshot color */
   --dark-blue: #0036a3;
   --text-white: #FFF;
   --text-white-opacity: rgba(255, 255, 255, 0.72);
