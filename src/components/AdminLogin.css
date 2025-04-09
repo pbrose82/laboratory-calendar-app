@@ -1,0 +1,154 @@
+/* AdminLogin.css - Styles for the admin login page */
+
+.admin-login-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.admin-login-card {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 460px;
+  overflow: hidden;
+}
+
+.admin-login-header {
+  background-color: #0047BB;
+  color: white;
+  padding: 20px;
+  text-align: center;
+}
+
+.admin-login-header i {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+
+.admin-login-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.admin-login-card form {
+  padding: 24px;
+}
+
+.login-error {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  border-left: 4px solid #dc3545;
+  font-size: 14px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.password-input {
+  position: relative;
+}
+
+.password-input input {
+  width: 100%;
+  padding: 12px 15px 12px 40px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.password-input input:focus {
+  border-color: #0047BB;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 71, 187, 0.2);
+}
+
+.password-input i {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #95a5a6;
+}
+
+.help-text {
+  margin-top: 6px;
+  color: #7f8c8d;
+  font-size: 13px;
+  font-style: italic;
+}
+
+.login-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  background-color: #0047BB;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.login-button:hover:not(:disabled) {
+  background-color: #003a9b;
+}
+
+.login-button:disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+}
+
+.login-button i {
+  margin-right: 8px;
+}
+
+.admin-login-footer {
+  background-color: #f8f9fa;
+  padding: 15px;
+  text-align: center;
+  border-top: 1px solid #eee;
+  color: #6c757d;
+  font-size: 14px;
+}
+
+.back-link {
+  color: #0047BB;
+  text-decoration: none;
+  margin-top: 8px;
+  display: inline-block;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+  .admin-login-container {
+    padding: 10px;
+  }
+  
+  .admin-login-card {
+    box-shadow: none;
+  }
+}
