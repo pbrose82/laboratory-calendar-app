@@ -140,7 +140,11 @@ app.post('/api/calendar-events', (req, res) => {
         notes: body.notes,
         recordId: body.recordId,
         sampleType: body.sampleType,
-        reminders: body.reminders
+        reminders: body.reminders,
+        // Add the new eventLink field
+        eventLink: body.eventLink || (body.recordId ? 
+          `EquipmentReservation \nRecordID: ${body.recordId}\nLink to record: https://app.alchemy.cloud/${body.tenantId}/record/${body.recordId}` : 
+          undefined)
       };
       
       // Convert dates to ISO format for FullCalendar compatibility
@@ -263,7 +267,11 @@ app.post('/api/calendar-events', (req, res) => {
         notes: body.description,
         recordId: body.recordId,
         sampleType: body.sampleType,
-        reminders: body.reminders
+        reminders: body.reminders,
+        // Add the eventLink field for legacy format too
+        eventLink: body.eventLink || (body.recordId ? 
+          `EquipmentReservation \nRecordID: ${body.recordId}\nLink to record: https://app.alchemy.cloud/${tenantId}/record/${body.recordId}` : 
+          undefined)
       };
       
       // Convert dates to ISO format for FullCalendar compatibility
@@ -408,6 +416,11 @@ app.post('/api/calendar-events', (req, res) => {
             console.error('Error converting dates in standard format:', dateError);
           }
           
+          // Add eventLink if recordId exists but eventLink doesn't
+          if (eventData.recordId && !eventData.eventLink) {
+            eventData.eventLink = `EquipmentReservation \nRecordID: ${eventData.recordId}\nLink to record: https://app.alchemy.cloud/${tenantId}/record/${eventData.recordId}`;
+          }
+          
           // If this is an update (existing event found), update it
           if (existingEventId) {
             const eventIndex = tenants[tenantId].events.findIndex(e => e.id === existingEventId);
@@ -457,6 +470,11 @@ app.post('/api/calendar-events', (req, res) => {
               console.error('Error converting dates in update:', dateError);
             }
             
+            // Update eventLink if recordId exists but eventLink doesn't
+            if (eventData.recordId && !eventData.eventLink) {
+              eventData.eventLink = `EquipmentReservation \nRecordID: ${eventData.recordId}\nLink to record: https://app.alchemy.cloud/${tenantId}/record/${eventData.recordId}`;
+            }
+            
             tenants[tenantId].events[eventIndex] = {
               ...tenants[tenantId].events[eventIndex],
               ...eventData
@@ -495,6 +513,11 @@ app.post('/api/calendar-events', (req, res) => {
               }
             } catch (dateError) {
               console.error('Error converting dates in update by ER number:', dateError);
+            }
+            
+            // Update eventLink if recordId exists but eventLink doesn't
+            if (eventData.recordId && !eventData.eventLink) {
+              eventData.eventLink = `EquipmentReservation \nRecordID: ${eventData.recordId}\nLink to record: https://app.alchemy.cloud/${tenantId}/record/${eventData.recordId}`;
             }
             
             tenants[tenantId].events[eventIndex] = {
@@ -794,6 +817,11 @@ app.put('/api/calendar-events/:eventId', (req, res) => {
       }
     } catch (dateError) {
       console.error('Error converting dates in PUT update:', dateError);
+    }
+    
+    // Update eventLink if recordId exists but eventLink doesn't
+    if (updateData.recordId && !updateData.eventLink) {
+      updateData.eventLink = `EquipmentReservation \nRecordID: ${updateData.recordId}\nLink to record: https://app.alchemy.cloud/${tenantId}/record/${updateData.recordId}`;
     }
     
     tenants[tenantId].events[eventIndex] = {
