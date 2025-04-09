@@ -1,6 +1,9 @@
 .admin-page {
   padding: 20px;
   text-align: left;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .admin-header {
@@ -13,6 +16,40 @@
 .admin-header h2 {
   margin: 0;
   color: #2c3e50;
+}
+
+/* Admin tabs */
+.admin-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.tab-btn {
+  padding: 10px 16px;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  font-weight: 500;
+  color: #495057;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.tab-btn:hover {
+  background-color: #e9ecef;
+}
+
+.tab-btn.active {
+  background-color: #1565C0;
+  color: white;
+  border-color: #1565C0;
+}
+
+.me-2 {
+  margin-right: 0.5rem;
 }
 
 .admin-section {
@@ -51,9 +88,9 @@
 }
 
 .form-group input:focus {
-  border-color: #3498db;
+  border-color: #1565C0;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+  box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.2);
 }
 
 .helper-text {
@@ -64,7 +101,7 @@
 }
 
 .submit-btn {
-  background-color: #2c3e50;
+  background-color: #1565C0;
   color: white;
   border: none;
   padding: 10px 15px;
@@ -75,7 +112,7 @@
 }
 
 .submit-btn:hover:not(:disabled) {
-  background-color: #34495e;
+  background-color: #0D47A1;
 }
 
 .submit-btn:disabled {
@@ -124,12 +161,12 @@
 }
 
 .view-btn {
-  background-color: #3498db;
+  background-color: #1565C0;
   color: white;
 }
 
 .view-btn:hover {
-  background-color: #2980b9;
+  background-color: #0D47A1;
 }
 
 .delete-btn {
@@ -188,7 +225,7 @@
 .tenant-url {
   flex-grow: 1;
   margin-right: 8px;
-  color: #3498db;
+  color: #1565C0;
 }
 
 .copy-btn {
@@ -205,38 +242,66 @@
   color: #2c3e50;
 }
 
-.api-docs {
-  background-color: #f8f9fa;
-  padding: 15px;
-  border-radius: 4px;
+/* Breadcrumb styles */
+.breadcrumb-container {
+  margin-bottom: 20px;
 }
 
-.code-block {
-  background-color: #2c3e50;
-  color: white;
-  padding: 10px 15px;
-  border-radius: 4px;
-  margin: 10px 0;
+.breadcrumb {
+  list-style: none;
+  padding: 0;
+  margin: 0;
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.breadcrumb-item {
+  display: inline-flex;
   align-items: center;
+  color: #6c757d;
 }
 
-.code-block .copy-btn {
-  color: #95a5a6;
+.breadcrumb-item + .breadcrumb-item::before {
+  display: inline-block;
+  padding: 0 8px;
+  color: #6c757d;
+  content: "/";
 }
 
-.code-block .copy-btn:hover {
-  color: white;
+.breadcrumb-item a {
+  color: #1565C0;
+  text-decoration: none;
 }
 
-.json-example {
-  background-color: #f8f9fa;
-  padding: 15px;
-  border-radius: 4px;
-  overflow-x: auto;
-  border: 1px solid #ddd;
-  margin: 10px 0;
-  white-space: pre-wrap;
-  font-family: monospace;
+.breadcrumb-item a:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb-item.active {
+  color: #6c757d;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .admin-tabs {
+    flex-direction: column;
+  }
+  
+  .tab-btn {
+    width: 100%;
+  }
+  
+  .tenant-table {
+    font-size: 14px;
+  }
+  
+  .tenant-table th,
+  .tenant-table td {
+    padding: 8px;
+  }
+  
+  .action-btn {
+    width: 28px;
+    height: 28px;
+  }
 }
