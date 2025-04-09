@@ -1,4 +1,4 @@
-// server.js - Optimized for Render deployment
+// server.js - Optimized for Render disk persistence
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
@@ -12,39 +12,74 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(bodyParser.json());
 
-// Data persistence for Render (file-based since we don't have a DB)
-const DATA_FILE = path.join(__dirname, 'tenant-data.json');
+// Data persistence configuration specifically for Render
+// This directory should be mounted as a persistent volume in Render
+const RENDER_DISK_DIR = process.env.RENDER_DISK_DIR || '/opt/render/project/src/data';
+const DATA_FILE = path.join(RENDER_DISK_DIR, 'tenant-data.json');
+
+// Ensure data directory exists
+try {
+  if (!fs.existsSync(RENDER_DISK_DIR)) {
+    fs.mkdirSync(RENDER_DISK_DIR, { recursive: true });
+    console.log(`Created persistent data directory at ${RENDER_DISK_DIR}`);
+  }
+} catch (error) {
+  console.error('Error creating data directory:', error);
+}
 
 // Initialize tenant data
 let tenants = {};
 
-// Load tenant data from file if it exists
-try {
-  if (fs.existsSync(DATA_FILE)) {
-    const data = fs.readFileSync(DATA_FILE, 'utf8');
-    tenants = JSON.parse(data);
-    console.log(`Loaded ${Object.keys(tenants).length} tenants from data file`);
-  }
-} catch (error) {
-  console.error('Error loading tenant data:', error);
-}
-
-// Function to save tenant data to file
-const saveTenantData = () => {
+// Load tenant data from disk
+const loadTenantData = () => {
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(tenants, null, 2));
+    console.log(`Loading tenant data from ${DATA_FILE}`);
+    
+    if (fs.existsSync(DATA_FILE)) {
+      const data = fs.readFileSync(DATA_FILE, 'utf8');
+      tenants = JSON.parse(data);
+      console.log(`Loaded ${Object.keys(tenants).length} tenants from disk`);
+    } else {
+      // Initialize with empty data
+      tenants = {};
+      console.log('No existing data file found, starting with empty tenant data');
+      // Save the initial empty data
+      saveTenantData();
+    }
   } catch (error) {
-    console.error('Error saving tenant data:', error);
+    console.error('Error loading tenant data:', error);
+    // If there was an error loading, initialize with empty data
+    tenants = {};
   }
 };
+
+// Function to save tenant data to disk
+const saveTenantData = () => {
+  try {
+    // Ensure directory exists
+    if (!fs.existsSync(RENDER_DISK_DIR)) {
+      fs.mkdirSync(RENDER_DISK_DIR, { recursive: true });
+    }
+    
+    fs.writeFileSync(DATA_FILE, JSON.stringify(tenants, null, 2));
+    console.log(`Saved tenant data to ${DATA_FILE}`);
+    return true;
+  } catch (error) {
+    console.error('Error saving tenant data:', error);
+    return false;
+  }
+};
+
+// Load data at startup
+loadTenantData();
 
 // Serve static files from the React app build directory
 app.use(express.static(path.join(__dirname, 'build')));
 
 /**
- * API endpoint to handle Alchemy updates for tenant calendars
+ * API endpoint to handle calendar events for tenants
  */
-app.post('/api/alchemy-update', (req, res) => {
+app.post('/api/calendar-events', (req, res) => {
   try {
     const { tenantId, eventData, action } = req.body;
     
@@ -61,9 +96,19 @@ app.post('/api/alchemy-update', (req, res) => {
       return res.status(400).json({ error: 'Action is required' });
     }
     
-    // Check if tenant exists
+    // Check if tenant exists, create if it doesn't
     if (!tenants[tenantId]) {
-      return res.status(404).json({ error: `Tenant "${tenantId}" not found` });
+      tenants[tenantId] = {
+        id: tenantId,
+        name: getDisplayName(tenantId),
+        createdAt: new Date().toISOString(),
+        events: [],
+        resources: [
+          { id: 'equipment-1', title: 'HPLC Machine' },
+          { id: 'equipment-2', title: 'Mass Spectrometer' },
+          { id: 'equipment-3', title: 'PCR Machine' }
+        ]
+      };
     }
     
     // Initialize events array if it doesn't exist
@@ -122,14 +167,17 @@ app.post('/api/alchemy-update', (req, res) => {
         return res.status(400).json({ error: `Invalid action: ${action}` });
     }
     
-    // Save tenant data after modification
-    saveTenantData();
+    // Save tenant data after modification to persistent disk
+    const saveSuccess = saveTenantData();
     
     console.log(`Processed ${action} for tenant ${tenantId}`);
-    return res.json({ success: true, data: result });
+    return res.json({ 
+      success: true, 
+      data: result
+    });
     
   } catch (error) {
-    console.error('Error handling Alchemy update:', error);
+    console.error('Error handling calendar event:', error);
     return res.status(500).json({ error: error.message });
   }
 });
@@ -164,7 +212,10 @@ app.post('/api/tenants', (req, res) => {
     // Save tenant data after creating a new tenant
     saveTenantData();
     
-    return res.status(201).json({ success: true, data: tenants[tenantId] });
+    return res.status(201).json({ 
+      success: true, 
+      data: tenants[tenantId]
+    });
   } catch (error) {
     console.error('Error creating tenant:', error);
     return res.status(500).json({ error: error.message });
@@ -218,12 +269,26 @@ app.delete('/api/tenants/:tenantId', (req, res) => {
     // Save tenant data after deleting a tenant
     saveTenantData();
     
-    return res.json({ success: true, message: `Tenant "${tenantId}" deleted successfully` });
+    return res.json({ 
+      success: true, 
+      message: `Tenant "${tenantId}" deleted successfully`
+    });
   } catch (error) {
     console.error('Error deleting tenant:', error);
     return res.status(500).json({ error: error.message });
   }
 });
+
+// Helper function to get display name for a tenant ID
+function getDisplayName(tenantId) {
+  if (tenantId === 'demo-tenant') {
+    return 'Demo Tenant';
+  } else if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
+    return 'Product CASE UAT';
+  } else {
+    return tenantId;
+  }
+}
 
 /**
  * The "catchall" handler: for any request that doesn't
@@ -239,4 +304,5 @@ app.get('*', (req, res) => {
  */
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  console.log(`Using ${RENDER_DISK_DIR} for data storage`);
 });
