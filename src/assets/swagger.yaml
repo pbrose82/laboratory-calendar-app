@@ -1,0 +1,331 @@
+openapi: 3.0.0
+info:
+  title: Laboratory Calendar API
+  description: API documentation for the Laboratory Calendar application
+  version: 1.0.0
+servers:
+  - url: /api
+    description: Current server
+paths:
+  /tenants:
+    get:
+      summary: List all tenants
+      description: Returns a list of all registered tenants
+      operationId: getTenants
+      tags:
+        - Tenants
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Tenant'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create a new tenant
+      description: Registers a new tenant in the system
+      operationId: createTenant
+      tags:
+        - Tenants
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tenantId
+                - tenantName
+              properties:
+                tenantId:
+                  type: string
+                  description: Unique identifier for the tenant
+                  example: lab-tenant-123
+                tenantName:
+                  type: string
+                  description: Display name for the tenant
+                  example: Laboratory Department
+      responses:
+        '201':
+          description: Tenant created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Tenant'
+        '400':
+          description: Bad request - Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict - Tenant ID already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /tenants/{tenantId}:
+    get:
+      summary: Get tenant details
+      description: Returns detailed information about a specific tenant
+      operationId: getTenant
+      tags:
+        - Tenants
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          description: ID of the tenant to fetch
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Tenant'
+        '404':
+          description: Tenant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete a tenant
+      description: Removes a tenant and all its data from the system
+      operationId: deleteTenant
+      tags:
+        - Tenants
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          description: ID of the tenant to delete
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tenant deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '404':
+          description: Tenant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /calendar-events:
+    post:
+      summary: Manage calendar events
+      description: Create, update, or delete calendar events for a tenant
+      operationId: manageCalendarEvents
+      tags:
+        - Calendar Events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tenantId
+                - eventData
+                - action
+              properties:
+                tenantId:
+                  type: string
+                  description: ID of the tenant that owns the event
+                  example: lab-tenant-123
+                eventData:
+                  type: object
+                  description: Event data
+                  properties:
+                    id:
+                      type: string
+                      description: Unique identifier for the event (required for update/delete)
+                    title:
+                      type: string
+                      description: Event title
+                    start:
+                      type: string
+                      format: date-time
+                      description: Event start time (ISO format)
+                    end:
+                      type: string
+                      format: date-time
+                      description: Event end time (ISO format)
+                    allDay:
+                      type: boolean
+                      description: Whether this is an all-day event
+                    resourceId:
+                      type: string
+                      description: ID of the associated resource (equipment)
+                    extendedProps:
+                      type: object
+                      description: Additional properties for the event
+                action:
+                  type: string
+                  description: Action to perform
+                  enum: [create, update, delete]
+      responses:
+        '200':
+          description: Operation completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    oneOf:
+                      - $ref: '#/components/schemas/CalendarEvent'
+                      - type: object
+                        properties:
+                          id:
+                            type: string
+                          deleted:
+                            type: boolean
+        '400':
+          description: Bad request - Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tenant or event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the tenant
+        name:
+          type: string
+          description: Display name for the tenant
+        createdAt:
+          type: string
+          format: date-time
+          description: When the tenant was created
+        events:
+          type: array
+          description: List of calendar events
+          items:
+            $ref: '#/components/schemas/CalendarEvent'
+        resources:
+          type: array
+          description: List of resources (equipment)
+          items:
+            $ref: '#/components/schemas/Resource'
+    CalendarEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the event
+        title:
+          type: string
+          description: Event title
+        start:
+          type: string
+          format: date-time
+          description: Event start time
+        end:
+          type: string
+          format: date-time
+          description: Event end time
+        allDay:
+          type: boolean
+          description: Whether this is an all-day event
+        resourceId:
+          type: string
+          description: ID of the associated resource
+        extendedProps:
+          type: object
+          description: Additional properties for the event
+          properties:
+            equipment:
+              type: string
+              description: Equipment name
+            technician:
+              type: string
+              description: Technician name
+            sampleType:
+              type: string
+              description: Type of sample being processed
+    Resource:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the resource
+        title:
+          type: string
+          description: Display name for the resource
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
