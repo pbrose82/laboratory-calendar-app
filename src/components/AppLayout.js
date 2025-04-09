@@ -11,7 +11,7 @@ function AppLayout({ children }) {
   // Extract tenant ID from path if on tenant path
   const tenantId = location.pathname.startsWith('/') && location.pathname.length > 1 && 
                     !location.pathname.startsWith('/admin') ? 
-                    location.pathname.substring(1) : null;
+                    location.pathname.substring(1).split('/')[0] : null;
   
   useEffect(() => {
     // Check if admin is authenticated from session storage
@@ -42,6 +42,14 @@ function AppLayout({ children }) {
     } else {
       return tenantId ? `${tenantId}` : '';
     }
+  };
+
+  // Check if a specific path is active
+  const isPathActive = (path) => {
+    if (tenantId) {
+      return location.pathname === `/${tenantId}${path}`;
+    }
+    return false;
   };
 
   return (
@@ -97,25 +105,69 @@ function AppLayout({ children }) {
                 {isExpanded && <span className="t-4">Dashboard</span>}
               </Link>
 
-              <Link to="/"
-                    className="c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l"
-                    title={isExpanded ? null : 'My Assignments'}>
-                <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
-                  <i className="fas fa-tasks u-color-white-opacity-72"></i>
-                </div>
-                {isExpanded && <span className="t-4">My Assignments</span>}
-              </Link>
-              
-              {/* Show only the current tenant in navigation with a user-friendly name */}
+              {/* Only show tenant-specific menu items if a tenant is selected */}
               {tenantId && (
-                <Link to={`/${tenantId}`}
-                      className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l c-selectable-item__dark--active`}
-                      title={isExpanded ? null : `${getTenantDisplayName()}`}>
-                  <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
-                    <i className="fas fa-calendar u-color-white-opacity-72"></i>
-                  </div>
-                  {isExpanded && <span className="t-4">{getTenantDisplayName()}</span>}
-                </Link>
+                <>
+                  {/* Calendar View - Default view */}
+                  <Link to={`/${tenantId}`}
+                        className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${location.pathname === `/${tenantId}` ? 'c-selectable-item__dark--active' : ''}`}
+                        title={isExpanded ? null : 'Calendar View'}>
+                    <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                      <i className="fas fa-calendar-alt u-color-white-opacity-72"></i>
+                    </div>
+                    {isExpanded && <span className="t-4">Calendar View</span>}
+                  </Link>
+
+                  {/* Resource Dashboard */}
+                  <Link to={`/${tenantId}/resource-dashboard`}
+                        className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${isPathActive('/resource-dashboard') ? 'c-selectable-item__dark--active' : ''}`}
+                        title={isExpanded ? null : 'Resource Dashboard'}>
+                    <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                      <i className="fas fa-tachometer-alt u-color-white-opacity-72"></i>
+                    </div>
+                    {isExpanded && <span className="t-4">Resource Dashboard</span>}
+                  </Link>
+
+                  {/* Equipment List View */}
+                  <Link to={`/${tenantId}/equipment-list`}
+                        className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${isPathActive('/equipment-list') ? 'c-selectable-item__dark--active' : ''}`}
+                        title={isExpanded ? null : 'Equipment List'}>
+                    <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                      <i className="fas fa-microscope u-color-white-opacity-72"></i>
+                    </div>
+                    {isExpanded && <span className="t-4">Equipment List</span>}
+                  </Link>
+
+                  {/* Technician Schedule */}
+                  <Link to={`/${tenantId}/technician-schedule`}
+                        className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${isPathActive('/technician-schedule') ? 'c-selectable-item__dark--active' : ''}`}
+                        title={isExpanded ? null : 'Technician Schedule'}>
+                    <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                      <i className="fas fa-user-md u-color-white-opacity-72"></i>
+                    </div>
+                    {isExpanded && <span className="t-4">Technician Schedule</span>}
+                  </Link>
+
+                  {/* Gantt Chart View */}
+                  <Link to={`/${tenantId}/gantt-chart`}
+                        className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${isPathActive('/gantt-chart') ? 'c-selectable-item__dark--active' : ''}`}
+                        title={isExpanded ? null : 'Gantt Chart'}>
+                    <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                      <i className="fas fa-tasks u-color-white-opacity-72"></i>
+                    </div>
+                    {isExpanded && <span className="t-4">Gantt Chart</span>}
+                  </Link>
+
+                  {/* Analytics & Reports */}
+                  <Link to={`/${tenantId}/analytics`}
+                        className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${isPathActive('/analytics') ? 'c-selectable-item__dark--active' : ''}`}
+                        title={isExpanded ? null : 'Analytics & Reports'}>
+                    <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                      <i className="fas fa-chart-bar u-color-white-opacity-72"></i>
+                    </div>
+                    {isExpanded && <span className="t-4">Analytics & Reports</span>}
+                  </Link>
+                </>
               )}
             </div>
           </div>
