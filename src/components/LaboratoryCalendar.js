@@ -9,18 +9,27 @@ import { laboratoryEvents, laboratoryResources } from '../data/sample-events';
 function LaboratoryCalendar() {
   const [tenants, setTenants] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Load tenants for display in the dashboard
+    // Check if admin is authenticated
+    const adminAuth = sessionStorage.getItem('adminAuthenticated');
+    setIsAdminAuthenticated(adminAuth === 'true');
+    
+    // Only load tenants if user is authenticated as admin
     async function loadTenants() {
-      setIsLoading(true);
-      try {
-        const tenantData = await fetchAllTenants();
-        setTenants(tenantData);
-      } catch (error) {
-        console.error('Error loading tenants:', error);
-      } finally {
-        setIsLoading(false);
+      if (adminAuth === 'true') {
+        setIsLoading(true);
+        try {
+          const tenantData = await fetchAllTenants();
+          setTenants(tenantData);
+        } catch (error) {
+          console.error('Error loading tenants:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        setTenants([]);
       }
     }
     
@@ -63,14 +72,11 @@ function LaboratoryCalendar() {
     <div className="dashboard-container">
       <div className="content-header">
         <h1>Laboratory Resource Calendar</h1>
-        <div className="header-actions">
-          <a href="/admin" className="btn btn-primary">
-            <i className="fas fa-cog me-2"></i>Manage Tenants
-          </a>
-        </div>
+        {/* Manage Tenants button removed as requested */}
       </div>
       
-      {tenants.length > 0 && (
+      {/* Only show tenant grid if admin is authenticated */}
+      {isAdminAuthenticated && tenants.length > 0 && (
         <div className="tenant-grid mb-4">
           <h2 className="section-title">Tenant Calendars</h2>
           <div className="row">
