@@ -1,5 +1,5 @@
 // src/services/apiClient.js
-// Client for interacting with the backend API
+// Simplified client for interacting with the backend API
 
 // Get the correct base URL for our API calls
 const getBaseUrl = () => {
@@ -16,20 +16,52 @@ const getBaseUrl = () => {
 const API_BASE_URL = getBaseUrl();
 
 /**
+ * Generic API request function with error handling
+ * @param {string} endpoint - API endpoint
+ * @param {Object} options - Fetch options
+ * @returns {Promise<any>}
+ */
+const apiRequest = async (endpoint, options = {}) => {
+  try {
+    // Set default headers if not provided
+    if (!options.headers) {
+      options.headers = {
+        'Content-Type': 'application/json',
+      };
+    }
+    
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+    
+    // Check if the request was successful
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        // If we can't parse the error as JSON, use status text
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+      
+      throw new Error(errorData.error || `API error: ${response.status}`);
+    }
+    
+    // Parse and return the response data
+    const data = await response.json();
+    return data.data;
+  } catch (error) {
+    console.error(`API request failed: ${error.message}`);
+    throw error;
+  }
+};
+
+/**
  * Get all tenants from the API
  * @returns {Promise<Array>} Array of tenant objects
  */
 export const fetchAllTenants = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/tenants`);
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch tenants');
-    }
-    
-    const data = await response.json();
-    return data.data || [];
+    const data = await apiRequest('/api/tenants');
+    return data || [];
   } catch (error) {
     console.error('Error fetching tenants:', error);
     throw error;
@@ -43,19 +75,13 @@ export const fetchAllTenants = async () => {
  */
 export const fetchTenant = async (tenantId) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/tenants/${tenantId}`);
-    
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
-      }
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch tenant');
-    }
-    
-    const data = await response.json();
-    return data.data;
+    const data = await apiRequest(`/api/tenants/${tenantId}`);
+    return data;
   } catch (error) {
+    // Special handling for 404 (not found)
+    if (error.message.includes('404')) {
+      return null;
+    }
     console.error(`Error fetching tenant ${tenantId}:`, error);
     throw error;
   }
@@ -69,21 +95,12 @@ export const fetchTenant = async (tenantId) => {
  */
 export const createNewTenant = async (tenantId, tenantName) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/tenants`, {
+    const data = await apiRequest('/api/tenants', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ tenantId, tenantName }),
     });
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create tenant');
-    }
-    
-    const data = await response.json();
-    return data.data;
+    return data;
   } catch (error) {
     console.error('Error creating tenant:', error);
     throw error;
@@ -97,14 +114,9 @@ export const createNewTenant = async (tenantId, tenantName) => {
  */
 export const deleteTenantById = async (tenantId) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/tenants/${tenantId}`, {
+    await apiRequest(`/api/tenants/${tenantId}`, {
       method: 'DELETE',
     });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to delete tenant');
-    }
     
     return true;
   } catch (error) {
@@ -114,31 +126,22 @@ export const deleteTenantById = async (tenantId) => {
 };
 
 /**
- * Process an Alchemy event update
+ * Process a calendar event
  * @param {string} tenantId - The tenant ID
  * @param {Object} eventData - The event data
  * @param {string} action - The action to perform (create, update, delete)
  * @returns {Promise<Object>} The result of the operation
  */
-export const processAlchemyEvent = async (tenantId, eventData, action) => {
+export const processCalendarEvent = async (tenantId, eventData, action) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/alchemy-update`, {
+    const data = await apiRequest('/api/calendar-events', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ tenantId, eventData, action }),
     });
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to process event');
-    }
-    
-    const data = await response.json();
-    return data.data;
+    return data;
   } catch (error) {
-    console.error('Error processing event:', error);
+    console.error('Error processing calendar event:', error);
     throw error;
   }
 };
