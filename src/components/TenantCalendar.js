@@ -16,6 +16,7 @@ function TenantCalendar() {
   const [error, setError] = useState(null);
   const [tenantName, setTenantName] = useState('');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [showWeekends, setShowWeekends] = useState(true); // State for weekend toggle
 
   useEffect(() => {
     // Check if admin is authenticated
@@ -151,18 +152,31 @@ function TenantCalendar() {
     }
   };
 
+  // Toggle function for showing/hiding weekends
+  const toggleWeekends = () => {
+    setShowWeekends(!showWeekends);
+  };
+
   return (
     <div className="dashboard-container">
-      {/* Remove breadcrumbs as requested */}
-      
       <div className="content-header">
         <h1>{tenantName}</h1>
         <div className="header-actions">
+          {/* Weekend toggle button */}
           <button 
-            className="btn btn-sm btn-outline-secondary"
+            className={`btn btn-sm ${showWeekends ? 'btn-outline-primary' : 'btn-primary'} me-2`}
+            onClick={toggleWeekends}
+            title={showWeekends ? "Hide weekends" : "Show weekends"}
+          >
+            <i className="fas fa-calendar-week me-1"></i>
+            {showWeekends ? "Hide Weekends" : "Show Weekends"}
+          </button>
+          
+          <button 
+            className="btn btn-sm btn-outline-secondary me-2"
             onClick={() => navigate('/')}
           >
-            <i className="fas fa-arrow-left me-2"></i>Back
+            <i className="fas fa-arrow-left me-1"></i>Back
           </button>
           
           {/* Show Admin button if user is authenticated */}
@@ -171,7 +185,7 @@ function TenantCalendar() {
               className="btn btn-sm btn-outline-primary"
               onClick={() => navigate('/admin')}
             >
-              <i className="fas fa-cog me-2"></i>Admin
+              <i className="fas fa-cog me-1"></i>Admin
             </button>
           )}
         </div>
@@ -214,6 +228,7 @@ function TenantCalendar() {
             slotMinTime="06:00:00" // Start calendar at 6am
             allDaySlot={true}
             allDayText="all-day"
+            weekends={showWeekends} // Control weekends visibility
           />
         </div>
       )}
