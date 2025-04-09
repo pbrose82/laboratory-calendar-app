@@ -76,6 +76,27 @@ const saveTenantData = () => {
   }
 };
 
+// Function to find an event by ER number in the title
+const findEventByERNumber = (tenantId, title) => {
+  if (!tenants[tenantId] || !tenants[tenantId].events) {
+    return null;
+  }
+  
+  // Extract ER number from the title (assuming format like "ER02 - Something")
+  const erMatch = title.match(/^(ER\d+)/i);
+  if (!erMatch) {
+    return null; // No ER number found in the title
+  }
+  
+  const erNumber = erMatch[1].toUpperCase(); // Normalize to uppercase
+  
+  // Find any event with the same ER number prefix
+  return tenants[tenantId].events.find(event => {
+    const eventERMatch = event.title.match(/^(ER\d+)/i);
+    return eventERMatch && eventERMatch[1].toUpperCase() === erNumber;
+  });
+};
+
 // Load data at startup
 loadTenantData();
 
@@ -84,6 +105,8 @@ app.use(express.static(path.join(__dirname, 'build')));
 
 /**
  * Enhanced API endpoint to handle multiple formats of calendar events
+ * - Supports ER number based updates
+ * - Doesn't require action field
  */
 app.post('/api/calendar-events', (req, res) => {
   try {
@@ -94,14 +117,19 @@ app.post('/api/calendar-events', (req, res) => {
     
     const body = req.body;
     
-    // Check if we have the hybrid format (title, action, tenantId directly at root)
-    if (body.title && body.action === 'create' && body.tenantId && body.start && body.end) {
+    // Check if we have the hybrid format from Alchemy (title, tenantId directly at root)
+    // Note: We no longer require action: "create"
+    if (body.title && body.tenantId && body.start && body.end) {
       console.log('Detected hybrid format from Alchemy');
       const tenantId = body.tenantId;
       
-      // Transform to our standard format with all properties at top level
+      // Check if an event with this ER number already exists
+      const existingEvent = findEventByERNumber(tenantId, body.title);
+      let isUpdate = false;
+      
+      // Create the event data with all properties
       const eventData = {
-        id: Date.now().toString(),
+        id: existingEvent ? existingEvent.id : Date.now().toString(),
         title: body.title,
         start: body.start,
         end: body.end,
@@ -113,7 +141,6 @@ app.post('/api/calendar-events', (req, res) => {
         recordId: body.recordId,
         sampleType: body.sampleType,
         reminders: body.reminders
-        // Add any other fields you want to support here
       };
       
       // Convert dates to ISO format for FullCalendar compatibility
@@ -156,38 +183,59 @@ app.post('/api/calendar-events', (req, res) => {
       // Log the complete event data
       console.log('Complete event data:', JSON.stringify(eventData, null, 2));
       
-      // Create tenant if needed
-      if (!tenants[tenantId]) {
-        console.log(`Creating new tenant: ${tenantId}`);
-        tenants[tenantId] = {
-          id: tenantId,
-          name: tenantId,
-          createdAt: new Date().toISOString(),
-          events: [],
-          resources: [
-            { id: 'equipment-1', title: 'HPLC Machine' },
-            { id: 'equipment-2', title: 'Mass Spectrometer' },
-            { id: 'equipment-3', title: 'PCR Machine' }
-          ]
-        };
+      // Check if this is an update or a new event
+      if (existingEvent) {
+        isUpdate = true;
+        console.log(`Found existing event with ER number. Updating event ID: ${existingEvent.id}`);
+        
+        // Find the index of the existing event
+        const eventIndex = tenants[tenantId].events.findIndex(e => e.id === existingEvent.id);
+        
+        // Update the existing event
+        if (eventIndex !== -1) {
+          tenants[tenantId].events[eventIndex] = eventData;
+        } else {
+          // Fallback if the event somehow doesn't exist anymore
+          isUpdate = false;
+          tenants[tenantId].events.push(eventData);
+        }
+      } else {
+        // This is a new event
+        console.log('No existing event found with this ER number. Creating new event.');
+        
+        // Create tenant if needed
+        if (!tenants[tenantId]) {
+          console.log(`Creating new tenant: ${tenantId}`);
+          tenants[tenantId] = {
+            id: tenantId,
+            name: tenantId,
+            createdAt: new Date().toISOString(),
+            events: [],
+            resources: [
+              { id: 'equipment-1', title: 'HPLC Machine' },
+              { id: 'equipment-2', title: 'Mass Spectrometer' },
+              { id: 'equipment-3', title: 'PCR Machine' }
+            ]
+          };
+        }
+        
+        // Initialize events array if it doesn't exist
+        if (!tenants[tenantId].events) {
+          tenants[tenantId].events = [];
+        }
+        
+        // Add the new event
+        tenants[tenantId].events.push(eventData);
       }
-      
-      // Initialize events array if it doesn't exist
-      if (!tenants[tenantId].events) {
-        tenants[tenantId].events = [];
-      }
-      
-      // Add to events
-      tenants[tenantId].events.push(eventData);
       
       // Save tenant data after modification
       const saveSuccess = saveTenantData();
       
-      console.log(`Processed hybrid format event for tenant ${tenantId}, save success: ${saveSuccess}`);
+      console.log(`Processed ${isUpdate ? 'update' : 'creation'} for tenant ${tenantId}, save success: ${saveSuccess}`);
       return res.json({ 
         success: true, 
         data: eventData,
-        message: "Event created from hybrid format"
+        message: isUpdate ? "Event updated from hybrid format" : "Event created from hybrid format"
       });
     } 
     // Check if this is the legacy Google Calendar format (has calendarId, summary)
@@ -197,8 +245,13 @@ app.post('/api/calendar-events', (req, res) => {
       // Extract tenant ID from the description or use a default
       const tenantId = body.tenantId || 'default-tenant';
       
+      // Check if an event with this ER number already exists
+      const existingEvent = findEventByERNumber(tenantId, body.summary);
+      let isUpdate = false;
+      
       // Transform to our internal format
       const eventData = {
+        id: existingEvent ? existingEvent.id : Date.now().toString(),
         title: body.summary,
         start: body.StartUse,  // Use the original field names
         end: body.EndUse,
@@ -246,22 +299,35 @@ app.post('/api/calendar-events', (req, res) => {
         tenants[tenantId].events = [];
       }
       
-      // Generate ID if none exists
-      if (!eventData.id) {
-        eventData.id = Date.now().toString();
+      // Check if this is an update or a new event
+      if (existingEvent) {
+        isUpdate = true;
+        console.log(`Found existing event with ER number. Updating event ID: ${existingEvent.id}`);
+        
+        // Find the index of the existing event
+        const eventIndex = tenants[tenantId].events.findIndex(e => e.id === existingEvent.id);
+        
+        // Update the existing event
+        if (eventIndex !== -1) {
+          tenants[tenantId].events[eventIndex] = eventData;
+        } else {
+          // Fallback if the event somehow doesn't exist anymore
+          isUpdate = false;
+          tenants[tenantId].events.push(eventData);
+        }
+      } else {
+        // Add as a new event
+        tenants[tenantId].events.push(eventData);
       }
-      
-      // Add to events
-      tenants[tenantId].events.push(eventData);
       
       // Save tenant data after modification
       saveTenantData();
       
-      console.log(`Processed legacy event for tenant ${tenantId}`);
+      console.log(`Processed ${isUpdate ? 'update' : 'creation'} for tenant ${tenantId}`);
       return res.json({ 
         success: true, 
         data: eventData,
-        message: "Event created from legacy format"
+        message: isUpdate ? "Event updated from legacy format" : "Event created from legacy format"
       });
     } 
     // Standard API format
@@ -306,9 +372,21 @@ app.post('/api/calendar-events', (req, res) => {
       
       switch (action) {
         case 'create':
+          // Check for existing event with same ER number if title is provided
+          let existingEventId = null;
+          if (eventData.title) {
+            const existingEvent = findEventByERNumber(tenantId, eventData.title);
+            if (existingEvent) {
+              existingEventId = existingEvent.id;
+              console.log(`Found existing event with ER number. Using ID: ${existingEventId}`);
+            }
+          }
+          
           // Generate ID if none exists
-          if (!eventData.id) {
+          if (!eventData.id && !existingEventId) {
             eventData.id = Date.now().toString();
+          } else if (existingEventId) {
+            eventData.id = existingEventId;
           }
           
           // Convert dates to ISO format
@@ -330,61 +408,136 @@ app.post('/api/calendar-events', (req, res) => {
             console.error('Error converting dates in standard format:', dateError);
           }
           
-          tenants[tenantId].events.push(eventData);
-          result = eventData;
+          // If this is an update (existing event found), update it
+          if (existingEventId) {
+            const eventIndex = tenants[tenantId].events.findIndex(e => e.id === existingEventId);
+            if (eventIndex !== -1) {
+              tenants[tenantId].events[eventIndex] = {
+                ...tenants[tenantId].events[eventIndex],
+                ...eventData
+              };
+              result = tenants[tenantId].events[eventIndex];
+            } else {
+              // If event not found despite having ID, just add it
+              tenants[tenantId].events.push(eventData);
+              result = eventData;
+            }
+          } else {
+            // Add as new event
+            tenants[tenantId].events.push(eventData);
+            result = eventData;
+          }
           break;
           
         case 'update':
-          if (!eventData.id) {
-            return res.status(400).json({ error: 'Event ID is required for update operation' });
-          }
-          
-          const eventIndex = tenants[tenantId].events.findIndex(event => event.id === eventData.id);
-          
-          if (eventIndex === -1) {
-            return res.status(404).json({ error: `Event "${eventData.id}" not found for tenant "${tenantId}"` });
-          }
-          
-          // Convert dates to ISO format if provided
-          try {
-            if (eventData.start && typeof eventData.start === 'string') {
-              const startDate = new Date(eventData.start);
-              if (!isNaN(startDate.getTime())) {
-                eventData.start = startDate.toISOString();
-              }
+          // First try to update by ID
+          if (eventData.id) {
+            const eventIndex = tenants[tenantId].events.findIndex(event => event.id === eventData.id);
+            
+            if (eventIndex === -1) {
+              return res.status(404).json({ error: `Event "${eventData.id}" not found for tenant "${tenantId}"` });
             }
             
-            if (eventData.end && typeof eventData.end === 'string') {
-              const endDate = new Date(eventData.end);
-              if (!isNaN(endDate.getTime())) {
-                eventData.end = endDate.toISOString();
+            // Convert dates to ISO format if provided
+            try {
+              if (eventData.start && typeof eventData.start === 'string') {
+                const startDate = new Date(eventData.start);
+                if (!isNaN(startDate.getTime())) {
+                  eventData.start = startDate.toISOString();
+                }
               }
+              
+              if (eventData.end && typeof eventData.end === 'string') {
+                const endDate = new Date(eventData.end);
+                if (!isNaN(endDate.getTime())) {
+                  eventData.end = endDate.toISOString();
+                }
+              }
+            } catch (dateError) {
+              console.error('Error converting dates in update:', dateError);
             }
-          } catch (dateError) {
-            console.error('Error converting dates in update:', dateError);
+            
+            tenants[tenantId].events[eventIndex] = {
+              ...tenants[tenantId].events[eventIndex],
+              ...eventData
+            };
+            
+            result = tenants[tenantId].events[eventIndex];
           }
-          
-          tenants[tenantId].events[eventIndex] = {
-            ...tenants[tenantId].events[eventIndex],
-            ...eventData
-          };
-          
-          result = tenants[tenantId].events[eventIndex];
+          // If no ID but has title, try to update by ER number
+          else if (eventData.title) {
+            const existingEvent = findEventByERNumber(tenantId, eventData.title);
+            
+            if (!existingEvent) {
+              return res.status(404).json({ error: `No event with ER number found in title "${eventData.title}" for tenant "${tenantId}"` });
+            }
+            
+            const eventIndex = tenants[tenantId].events.findIndex(e => e.id === existingEvent.id);
+            
+            if (eventIndex === -1) {
+              return res.status(404).json({ error: `Event "${existingEvent.id}" not found for tenant "${tenantId}"` });
+            }
+            
+            // Convert dates to ISO format if provided
+            try {
+              if (eventData.start && typeof eventData.start === 'string') {
+                const startDate = new Date(eventData.start);
+                if (!isNaN(startDate.getTime())) {
+                  eventData.start = startDate.toISOString();
+                }
+              }
+              
+              if (eventData.end && typeof eventData.end === 'string') {
+                const endDate = new Date(eventData.end);
+                if (!isNaN(endDate.getTime())) {
+                  eventData.end = endDate.toISOString();
+                }
+              }
+            } catch (dateError) {
+              console.error('Error converting dates in update by ER number:', dateError);
+            }
+            
+            tenants[tenantId].events[eventIndex] = {
+              ...tenants[tenantId].events[eventIndex],
+              ...eventData
+            };
+            
+            result = tenants[tenantId].events[eventIndex];
+          } else {
+            return res.status(400).json({ error: 'Either event ID or title with ER number is required for update operation' });
+          }
           break;
           
         case 'delete':
-          if (!eventData.id) {
-            return res.status(400).json({ error: 'Event ID is required for delete operation' });
+          if (eventData.id) {
+            // Delete by ID
+            const initialLength = tenants[tenantId].events.length;
+            tenants[tenantId].events = tenants[tenantId].events.filter(event => event.id !== eventData.id);
+            
+            if (tenants[tenantId].events.length === initialLength) {
+              return res.status(404).json({ error: `Event "${eventData.id}" not found for tenant "${tenantId}"` });
+            }
+            
+            result = { id: eventData.id, deleted: true };
+          } else if (eventData.title) {
+            // Delete by ER number
+            const existingEvent = findEventByERNumber(tenantId, eventData.title);
+            
+            if (!existingEvent) {
+              return res.status(404).json({ error: `No event with ER number found in title "${eventData.title}" for tenant "${tenantId}"` });
+            }
+            
+            const initialLength = tenants[tenantId].events.length;
+            tenants[tenantId].events = tenants[tenantId].events.filter(event => event.id !== existingEvent.id);
+            
+            if (tenants[tenantId].events.length === initialLength) {
+              return res.status(404).json({ error: `Event "${existingEvent.id}" not found for tenant "${tenantId}"` });
+            }
+            
+            result = { id: existingEvent.id, deleted: true };
+          } else {
+            return res.status(400).json({ error: 'Either event ID or title with ER number is required for delete operation' });
           }
-          
-          const initialLength = tenants[tenantId].events.length;
-          tenants[tenantId].events = tenants[tenantId].events.filter(event => event.id !== eventData.id);
-          
-          if (tenants[tenantId].events.length === initialLength) {
-            return res.status(404).json({ error: `Event "${eventData.id}" not found for tenant "${tenantId}"` });
-          }
-          
-          result = { id: eventData.id, deleted: true };
           break;
           
         default:
@@ -408,7 +561,7 @@ app.post('/api/calendar-events', (req, res) => {
         received: body,
         expectedFormats: [
           "Standard API format: {tenantId, action, eventData}",
-          "Hybrid format: {title, action, tenantId, start, end}",
+          "Hybrid format: {title, tenantId, start, end}",
           "Legacy format: {calendarId, summary, StartUse, EndUse}"
         ]
       });
