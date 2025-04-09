@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Routes, Route } from 'react-router-dom';
 import { fetchAllTenants, createNewTenant, deleteTenantById } from '../services/apiClient';
+import ApiDocumentation from './ApiDocumentation';
 import './AdminPage.css';
 
 function AdminPage() {
@@ -12,14 +13,22 @@ function AdminPage() {
   const [statusMessage, setStatusMessage] = useState('');
   const [statusType, setStatusType] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [activeTab, setActiveTab] = useState('tenants'); // 'tenants' or 'api-docs'
 
   // Base URL for tenant links - use window.location for Render host
   const baseUrl = window.location.origin;
 
   useEffect(() => {
+    // Check if admin is authenticated
+    const adminAuth = sessionStorage.getItem('adminAuthenticated');
+    if (!adminAuth) {
+      navigate('/admin-login');
+      return;
+    }
+    
     // Load all tenants when the component mounts
     loadTenants();
-  }, []);
+  }, [navigate]);
 
   const loadTenants = async () => {
     setIsLoading(true);
@@ -96,28 +105,15 @@ function AdminPage() {
       });
   };
 
-  return (
-    <div className="dashboard-container">
-      {/* Breadcrumbs */}
-      <div className="breadcrumb-container">
-        <ul className="breadcrumb">
-          <li className="breadcrumb-item"><a href="/">Home</a></li>
-          <li className="breadcrumb-item active">Administration</li>
-        </ul>
-      </div>
-      
-      {/* Header */}
-      <div className="content-header">
-        <h1>Laboratory Calendar Administration</h1>
-      </div>
-      
-      {statusMessage && (
-        <div className={`status-message ${statusType}`}>
-          {statusMessage}
-        </div>
-      )}
-      
-      <div className="admin-page">
+  // API Documentation section
+  const renderApiDocsSection = () => {
+    return <ApiDocumentation />;
+  };
+
+  // Tenant Management section
+  const renderTenantSection = () => {
+    return (
+      <>
         <div className="admin-section">
           <h3>Create New Tenant</h3>
           <form onSubmit={handleCreateTenant}>
@@ -223,43 +219,51 @@ function AdminPage() {
             </div>
           )}
         </div>
-        
-        <div className="admin-section">
-          <h3>API Documentation</h3>
-          <div className="api-docs">
-            <p>To update a tenant's calendar from Alchemy, send a POST request to:</p>
-            <div className="code-block">
-              <code>{baseUrl}/api/alchemy-update</code>
-              <button 
-                className="copy-btn"
-                onClick={() => copyToClipboard(`${baseUrl}/api/alchemy-update`)}
-                title="Copy URL to clipboard"
-              >
-                <i className="fas fa-copy"></i>
-              </button>
-            </div>
-            
-            <p>Request body format:</p>
-            <pre className="json-example">
-{`{
-  "tenantId": "tenant-identifier",
-  "action": "create", // or "update" or "delete"
-  "eventData": {
-    "id": "unique-event-id", // optional for "create", required for "update"/"delete"
-    "title": "Event Title",
-    "start": "2024-04-15T09:00:00",
-    "end": "2024-04-15T11:00:00",
-    "resourceId": "equipment-1", // optional
-    "extendedProps": {
-      "equipment": "HPLC Machine",
-      "technician": "Dr. Smith",
-      "sampleType": "Water Solubility Test"
-    }
-  }
-}`}
-            </pre>
-          </div>
+      </>
+    );
+  };
+
+  return (
+    <div className="dashboard-container">
+      {/* Breadcrumbs */}
+      <div className="breadcrumb-container">
+        <ul className="breadcrumb">
+          <li className="breadcrumb-item"><a href="/">Home</a></li>
+          <li className="breadcrumb-item active">Administration</li>
+        </ul>
+      </div>
+      
+      {/* Header */}
+      <div className="content-header">
+        <h1>Laboratory Calendar Administration</h1>
+      </div>
+      
+      {statusMessage && (
+        <div className={`status-message ${statusType}`}>
+          {statusMessage}
         </div>
+      )}
+      
+      {/* Tab Navigation */}
+      <div className="admin-tabs">
+        <button 
+          className={`tab-btn ${activeTab === 'tenants' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tenants')}
+        >
+          <i className="fas fa-users-cog me-2"></i>
+          Tenant Management
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'api-docs' ? 'active' : ''}`}
+          onClick={() => setActiveTab('api-docs')}
+        >
+          <i className="fas fa-book me-2"></i>
+          API Documentation
+        </button>
+      </div>
+      
+      <div className="admin-page">
+        {activeTab === 'tenants' ? renderTenantSection() : renderApiDocsSection()}
       </div>
     </div>
   );
