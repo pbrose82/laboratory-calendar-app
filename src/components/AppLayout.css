@@ -1,8 +1,8 @@
 /* AppLayout.css - Styles for the layout with left navigation */
 
 :root {
-  --primary-color: #1565C0; /* Adjusted to match screenshot color */
-  --dark-blue: #0036a3;
+  --primary-color: #1565C0; /* Updated to new blue color */
+  --dark-blue: #0D47A1; /* Darker shade for hover states */
   --text-white: #FFF;
   --text-white-opacity: rgba(255, 255, 255, 0.72);
   --hover-bg: rgba(255, 255, 255, 0.1);
