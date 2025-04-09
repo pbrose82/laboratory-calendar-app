@@ -94,60 +94,85 @@ app.post('/api/calendar-events', (req, res) => {
     
     const body = req.body;
     
-    // Check if we have the hybrid format (title, action, tenantId directly at root)
-    if (body.title && body.action === 'create' && body.tenantId && body.start && body.end) {
-      console.log('Detected hybrid format from Alchemy');
-      const tenantId = body.tenantId;
+    // Find this section in your server.js file (around line 120-160):
+
+// Check if we have the hybrid format (title, action, tenantId directly at root)
+if (body.title && body.action === 'create' && body.tenantId && body.start && body.end) {
+  console.log('Detected hybrid format from Alchemy');
+  const tenantId = body.tenantId;
+  
+  // Transform to our standard format
+  const eventData = {
+    title: body.title,
+    start: body.start,
+    end: body.end,
+    allDay: false,
+    extendedProps: {
+      location: body.location,
+      reminders: body.reminders
+    }
+  };
+  
+  // ADDED DATE CONVERSION - Convert dates to ISO format for FullCalendar compatibility
+  try {
+    // Parse the date strings from Alchemy format to ISO format
+    const startDate = new Date(body.start);
+    const endDate = new Date(body.end);
+    
+    // Make sure the dates are valid before using them
+    if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+      eventData.start = startDate.toISOString();
+      eventData.end = endDate.toISOString();
       
-      // Transform to our standard format
-      const eventData = {
-        title: body.title,
-        start: body.start,
-        end: body.end,
-        allDay: false,
-        extendedProps: {
-          location: body.location,
-          reminders: body.reminders
-        }
-      };
-      
-      // Create tenant if needed
-      if (!tenants[tenantId]) {
-        console.log(`Creating new tenant: ${tenantId}`);
-        tenants[tenantId] = {
-          id: tenantId,
-          name: tenantId,
-          createdAt: new Date().toISOString(),
-          events: [],
-          resources: [
-            { id: 'equipment-1', title: 'HPLC Machine' },
-            { id: 'equipment-2', title: 'Mass Spectrometer' },
-            { id: 'equipment-3', title: 'PCR Machine' }
-          ]
-        };
-      }
-      
-      // Initialize events array if it doesn't exist
-      if (!tenants[tenantId].events) {
-        tenants[tenantId].events = [];
-      }
-      
-      // Generate ID if none exists
-      eventData.id = Date.now().toString();
-      
-      // Add to events
-      tenants[tenantId].events.push(eventData);
-      
-      // Save tenant data after modification
-      const saveSuccess = saveTenantData();
-      
-      console.log(`Processed hybrid format event for tenant ${tenantId}, save success: ${saveSuccess}`);
-      return res.json({ 
-        success: true, 
-        data: eventData,
-        message: "Event created from hybrid format"
-      });
-    } 
+      // Log the date conversion for debugging
+      console.log('Converted dates to ISO format:');
+      console.log('Original start:', body.start, 'ISO start:', eventData.start);
+      console.log('Original end:', body.end, 'ISO end:', eventData.end);
+    } else {
+      console.warn('Could not parse dates from Alchemy format, using as-is');
+    }
+  } catch (dateError) {
+    console.error('Error converting dates to ISO format:', dateError);
+    // Continue with original format if conversion fails
+  }
+  
+  // Create tenant if needed
+  if (!tenants[tenantId]) {
+    console.log(`Creating new tenant: ${tenantId}`);
+    tenants[tenantId] = {
+      id: tenantId,
+      name: tenantId,
+      createdAt: new Date().toISOString(),
+      events: [],
+      resources: [
+        { id: 'equipment-1', title: 'HPLC Machine' },
+        { id: 'equipment-2', title: 'Mass Spectrometer' },
+        { id: 'equipment-3', title: 'PCR Machine' }
+      ]
+    };
+  }
+  
+  // Initialize events array if it doesn't exist
+  if (!tenants[tenantId].events) {
+    tenants[tenantId].events = [];
+  }
+  
+  // Generate ID if none exists
+  eventData.id = Date.now().toString();
+  
+  // Add to events
+  tenants[tenantId].events.push(eventData);
+  
+  // Save tenant data after modification
+  const saveSuccess = saveTenantData();
+  
+  console.log(`Processed hybrid format event for tenant ${tenantId}, save success: ${saveSuccess}`);
+  return res.json({ 
+    success: true, 
+    data: eventData,
+    message: "Event created from hybrid format"
+  });
+}
     // Check if this is the legacy Google Calendar format (has calendarId, summary)
     else if (body.calendarId && body.summary) {
       console.log('Received legacy Google Calendar format request');
