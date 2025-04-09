@@ -1,7 +1,7 @@
 /* AppLayout.css - Styles for the layout with left navigation */
 
 :root {
-  --primary-color: #0047BB;
+  --primary-color: #0052CC; /* Adjusted to match screenshot color */
   --dark-blue: #0036a3;
   --text-white: #FFF;
   --text-white-opacity: rgba(255, 255, 255, 0.72);
@@ -220,23 +220,17 @@ body {
 }
 
 /* Admin section */
-.admin-section-header {
-  padding: 0 16px;
+.admin-header {
   margin-top: auto;
-  margin-bottom: 8px;
-}
-
-.admin-section-header h3 {
+  padding: 10px 0 5px 32px;
   color: var(--text-white-opacity);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.5px;
-  padding-left: 16px;
 }
 
-.admin-section {
-  margin-top: 4px;
-  margin-bottom: 16px;
+.admin-menu {
+  margin-bottom: 15px;
 }
 
 /* Admin button (for logout) */
@@ -254,7 +248,6 @@ body {
   color: var(--text-white-opacity);
   padding: 10px 0;
   text-align: center;
-  margin-top: auto;
   font-size: 12px;
 }
 
@@ -327,7 +320,7 @@ body {
   .c-sidenav--wide .search-input-transparent,
   .c-sidenav--wide .u-margin-left-xs,
   .c-sidenav--wide .t-4,
-  .c-sidenav--wide .admin-section-header,
+  .c-sidenav--wide .admin-header,
   .c-sidenav--wide .admin-auth-link span {
     display: none;
   }
