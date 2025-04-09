@@ -6,6 +6,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { fetchTenant, processAlchemyEvent } from '../services/apiClient';
 import { demoTenantEvents, demoTenantResources } from '../data/sample-events';
+import './TenantCalendar.css';
 
 function TenantCalendar() {
   const { tenantId } = useParams();
