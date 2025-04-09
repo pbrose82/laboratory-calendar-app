@@ -8,7 +8,7 @@ import { fetchTenant, processCalendarEvent } from '../services/apiClient';
 import { demoTenantEvents, demoTenantResources } from '../data/sample-events';
 import './TenantCalendar.css';
 
-// ADDED: Helper function defined outside of component to avoid linting errors
+// Helper function defined outside of component to ensure ISO date format
 const ensureISODateFormat = (events) => {
   if (!Array.isArray(events)) return [];
   
@@ -91,7 +91,7 @@ function TenantCalendar() {
         if (tenantData) {
           console.log('Loaded tenant data:', tenantData);
           
-          // MODIFIED - Process events to ensure ISO date format
+          // Process events to ensure ISO date format
           const formattedEvents = ensureISODateFormat(tenantData.events || []);
           console.log('Events after date format validation:', formattedEvents);
           setEvents(formattedEvents);
@@ -114,7 +114,7 @@ function TenantCalendar() {
     if (tenantId) {
       loadTenantData();
     }
-  }, [tenantId, tenantName]);
+}, [tenantId, tenantName]);
 
   const handleDateSelect = async (selectInfo) => {
     const title = prompt('Please enter a new event title:');
@@ -162,22 +162,47 @@ function TenantCalendar() {
 
   const handleEventClick = (clickInfo) => {
     const event = clickInfo.event;
-    const extendedProps = event.extendedProps || {};
+    
+    // Log the full event data for debugging
+    console.log('Clicked event full data:', event);
     
     // Find the resource title if a resourceId is assigned
-    const resourceTitle = resources.find(r => r.id === extendedProps.resourceId)?.title || 'None';
+    const resourceTitle = resources.find(r => r.id === event.resourceId)?.title || 'None';
 
-    alert(`
-      Event Details:
-      Title: ${event.title}
-      Start: ${event.start.toLocaleString()}
-      End: ${event.end ? event.end.toLocaleString() : 'N/A'}
-      
-      Additional Information:
-      Equipment: ${resourceTitle}
-      Technician: ${extendedProps.technician || 'N/A'}
-      Sample Type: ${extendedProps.sampleType || 'N/A'}
-    `);
+    // Build a comprehensive details message with all available properties
+    let detailsMessage = `
+Event Details:
+Title: ${event.title}
+Start: ${event.start.toLocaleString()}
+End: ${event.end ? event.end.toLocaleString() : 'N/A'}
+`;
+    
+    // Add all properties that might exist
+    // First check top-level props, then check extendedProps
+    const checkAndAddProp = (propName, label) => {
+      // First check if it's directly in event object or in _def object
+      if (event[propName] !== undefined) {
+        detailsMessage += `\n${label}: ${event[propName]}`;
+      } 
+      // Then check if it's in extendedProps
+      else if (event.extendedProps && event.extendedProps[propName] !== undefined) {
+        detailsMessage += `\n${label}: ${event.extendedProps[propName]}`;
+      }
+    };
+    
+    // Check all possible properties
+    checkAndAddProp('location', 'Location');
+    checkAndAddProp('equipment', 'Equipment');
+    if (event.resourceId) {
+      detailsMessage += `\nResource: ${resourceTitle} (ID: ${event.resourceId})`;
+    }
+    checkAndAddProp('technician', 'Technician');
+    checkAndAddProp('sampleType', 'Sample Type');
+    checkAndAddProp('notes', 'Notes');
+    checkAndAddProp('recordId', 'Record ID');
+    
+    // Show the alert with all details
+    alert(detailsMessage);
   };
   
   const handleEventDrop = async (eventDropInfo) => {
@@ -365,6 +390,42 @@ function TenantCalendar() {
             allDaySlot={true}
             allDayText="all-day"
             weekends={showWeekends} // Control weekends visibility
+            
+            // Add this eventDataTransform function to handle both top-level and nested properties
+            eventDataTransform={(event) => {
+              // For handling the transition from nested to top-level properties
+              // This ensures both formats work
+              const transformedEvent = { ...event };
+              
+              // Initialize extendedProps if it doesn't exist
+              if (!transformedEvent.extendedProps) {
+                transformedEvent.extendedProps = {};
+              }
+              
+              // List of properties that might be at top level or in extendedProps
+              const propsToCheck = [
+                'location', 'equipment', 'technician', 'notes', 
+                'recordId', 'sampleType', 'reminders'
+              ];
+              
+              // Ensure all properties are accessible in both places
+              // This allows the event handler to check both locations
+              propsToCheck.forEach(prop => {
+                // Move top-level props to extendedProps for backward compatibility
+                if (transformedEvent[prop] !== undefined && 
+                    transformedEvent.extendedProps[prop] === undefined) {
+                  transformedEvent.extendedProps[prop] = transformedEvent[prop];
+                }
+                
+                // Also copy from extendedProps to top level for forward compatibility
+                if (transformedEvent.extendedProps[prop] !== undefined && 
+                    transformedEvent[prop] === undefined) {
+                  transformedEvent[prop] = transformedEvent.extendedProps[prop];
+                }
+              });
+              
+              return transformedEvent;
+            }}
           />
         </div>
       )}
