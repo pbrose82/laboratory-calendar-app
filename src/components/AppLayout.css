@@ -1,0 +1,244 @@
+/* AppLayout.css - Styles for the layout with left navigation */
+
+:root {
+  --nav-width: 240px;
+  --header-height: 60px;
+  --primary-color: #0047BB;
+  --secondary-color: #3F88F6;
+  --nav-bg: #2c3e50;
+  --nav-text: #ecf0f1;
+  --nav-active: #3498db;
+  --body-bg: #f4f6f9;
+  --content-bg: #ffffff;
+  --border-color: #e0e0e0;
+}
+
+/* Basic Reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--body-bg);
+  min-height: 100vh;
+}
+
+/* Container Layout */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* Left Navigation Styles */
+.left-nav {
+  width: var(--nav-width);
+  background-color: var(--nav-bg);
+  color: var(--nav-text);
+  position: fixed;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+}
+
+.nav-header {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-logo {
+  height: 40px;
+  max-width: 100%;
+}
+
+.nav-menu {
+  padding: 20px 0;
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+.nav-menu ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.nav-menu li {
+  margin-bottom: 5px;
+}
+
+.nav-menu a {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  color: var(--nav-text);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.nav-menu a:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-menu li.active a {
+  background-color: var(--nav-active);
+  color: white;
+  border-left: 3px solid white;
+}
+
+.nav-menu i {
+  margin-right: 10px;
+  width: 20px;
+  text-align: center;
+}
+
+.nav-divider {
+  padding: 15px 15px 5px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tenant-nav-item {
+  margin-left: 10px;
+}
+
+.nav-footer {
+  padding: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.help-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 5px;
+  color: var(--nav-text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.help-button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.help-button i {
+  margin-right: 8px;
+}
+
+/* Main Content Styles */
+.main-content {
+  margin-left: var(--nav-width);
+  width: calc(100% - var(--nav-width));
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-wrapper {
+  padding: 20px;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* For small screens, collapse the menu */
+@media (max-width: 768px) {
+  .left-nav {
+    width: 60px;
+  }
+  
+  .nav-menu a span, 
+  .nav-menu .nav-divider span,
+  .help-button span {
+    display: none;
+  }
+  
+  .main-content {
+    margin-left: 60px;
+    width: calc(100% - 60px);
+  }
+  
+  .nav-menu a {
+    justify-content: center;
+    padding: 15px 0;
+  }
+  
+  .nav-menu i {
+    margin-right: 0;
+    font-size: 1.2rem;
+  }
+  
+  .tenant-nav-item {
+    margin-left: 0;
+  }
+}
+
+/* Laboratory calendar specific overrides */
+.laboratory-calendar {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  flex-grow: 1;
+}
+
+/* Header styles within content */
+.content-header {
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.content-header h1, 
+.content-header h2 {
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+/* Breadcrumb styles */
+.breadcrumb-container {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  padding: 10px 20px;
+  margin-bottom: 20px;
+}
+
+.breadcrumb {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+}
+
+.breadcrumb-item:not(:first-child)::before {
+  content: '/';
+  margin: 0 10px;
+  color: #6c757d;
+}
+
+.breadcrumb-item a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.breadcrumb-item.active {
+  color: #6c757d;
+}
