@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, Routes, Route } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { fetchAllTenants, createNewTenant, deleteTenantById } from '../services/apiClient';
-import ApiDocumentation from './ApiDocumentation';
+import SwaggerDocs from './SwaggerDocs';
 import './AdminPage.css';
 
 function AdminPage() {
@@ -105,12 +105,7 @@ function AdminPage() {
       });
   };
 
-  // API Documentation section
-  const renderApiDocsSection = () => {
-    return <ApiDocumentation />;
-  };
-
-  // Tenant Management section
+  // Render the tenant management section
   const renderTenantSection = () => {
     return (
       <>
@@ -263,7 +258,7 @@ function AdminPage() {
       </div>
       
       <div className="admin-page">
-        {activeTab === 'tenants' ? renderTenantSection() : renderApiDocsSection()}
+        {activeTab === 'tenants' ? renderTenantSection() : <SwaggerDocs />}
       </div>
     </div>
   );
