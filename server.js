@@ -218,7 +218,7 @@ app.post('/api/calendar-events', (req, res) => {
             resources: [
               { id: 'equipment-1', title: 'HPLC Machine' },
               { id: 'equipment-2', title: 'Mass Spectrometer' },
-              { id: 'equipment-3', title: 'PCR Machine' }
+              { id: 'equipment-3', title: 'GCMS Machine' }
             ]
           };
         }
@@ -297,7 +297,7 @@ app.post('/api/calendar-events', (req, res) => {
           resources: [
             { id: 'equipment-1', title: 'HPLC Machine' },
             { id: 'equipment-2', title: 'Mass Spectrometer' },
-            { id: 'equipment-3', title: 'PCR Machine' }
+            { id: 'equipment-3', title: 'GCMS Machine' }
           ]
         };
       }
@@ -366,7 +366,7 @@ app.post('/api/calendar-events', (req, res) => {
           resources: [
             { id: 'equipment-1', title: 'HPLC Machine' },
             { id: 'equipment-2', title: 'Mass Spectrometer' },
-            { id: 'equipment-3', title: 'PCR Machine' }
+            { id: 'equipment-3', title: 'GCMS Machine' }
           ]
         };
       }
@@ -618,7 +618,7 @@ app.post('/api/tenants', (req, res) => {
       resources: [
         { id: 'equipment-1', title: 'HPLC Machine' },
         { id: 'equipment-2', title: 'Mass Spectrometer' },
-        { id: 'equipment-3', title: 'PCR Machine' }
+        { id: 'equipment-3', title: 'GCMS Machine' }
       ]
     };
     
