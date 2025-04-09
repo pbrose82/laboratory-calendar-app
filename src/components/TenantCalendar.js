@@ -4,7 +4,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { fetchTenant, processAlchemyEvent } from '../services/apiClient';
+import { fetchTenant, processCalendarEvent } from '../services/apiClient';
 import { demoTenantEvents, demoTenantResources } from '../data/sample-events';
 import './TenantCalendar.css';
 
@@ -17,7 +17,7 @@ function TenantCalendar() {
   const [error, setError] = useState(null);
   const [tenantName, setTenantName] = useState('');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [showWeekends, setShowWeekends] = useState(true); // State for weekend toggle
+  const [showWeekends, setShowWeekends] = useState(true);
 
   useEffect(() => {
     // Check if admin is authenticated
@@ -26,26 +26,35 @@ function TenantCalendar() {
     
     async function loadTenantData() {
       try {
+        setLoading(true);
+        
         // Special handling for demo tenant
         if (tenantId === 'demo-tenant') {
-          setEvents(demoTenantEvents);
+          // For demo tenant, check if we have saved data in localStorage
+          const savedDemoData = localStorage.getItem('demo-tenant-events');
+          if (savedDemoData) {
+            setEvents(JSON.parse(savedDemoData));
+          } else {
+            setEvents(demoTenantEvents);
+            // Save initial demo data to localStorage
+            localStorage.setItem('demo-tenant-events', JSON.stringify(demoTenantEvents));
+          }
           setResources(demoTenantResources);
           setTenantName('Demo Tenant');
           setLoading(false);
           return;
         }
         
-        // Special handling for our Product CASE UAT tenant
-        if (tenantId === 'productcaseelnandlims') {
-          setTenantName('Product CASE UAT Calendar');
-          // We'll still load events from API if available
+        // Special handling for Product CASE UAT tenant
+        if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
+          setTenantName('Product CASE UAT');
         }
         
         // Normal tenant handling from API
-        setLoading(true);
         const tenantData = await fetchTenant(tenantId);
         
         if (tenantData) {
+          console.log('Loaded tenant data:', tenantData);
           setEvents(tenantData.events || []);
           setResources(tenantData.resources || []);
           if (!tenantName) {
@@ -85,15 +94,20 @@ function TenantCalendar() {
         resourceId: resources.length > 0 ? resources[0].id : undefined
       };
       
-      // For demo tenant, just add to state
+      // For demo tenant, handle with localStorage
       if (tenantId === 'demo-tenant') {
-        setEvents(prevEvents => [...prevEvents, newEvent]);
+        const updatedEvents = [...events, newEvent];
+        setEvents(updatedEvents);
         calendarApi.addEvent(newEvent);
+        
+        // Save to localStorage
+        localStorage.setItem('demo-tenant-events', JSON.stringify(updatedEvents));
         return;
       }
       
       // Process through API to save to backend
-      const savedEvent = await processAlchemyEvent(tenantId, newEvent, 'create');
+      const savedEvent = await processCalendarEvent(tenantId, newEvent, 'create');
+      console.log('Event created successfully:', savedEvent);
       
       // Add to calendar
       calendarApi.addEvent(savedEvent);
@@ -101,6 +115,7 @@ function TenantCalendar() {
       // Update local state
       setEvents(prevEvents => [...prevEvents, savedEvent]);
     } catch (error) {
+      console.error('Error creating event:', error);
       alert(`Error creating event: ${error.message}`);
     }
   };
@@ -136,20 +151,54 @@ function TenantCalendar() {
         end: event.endStr
       };
       
-      // For demo tenant, just update local state
+      // For demo tenant, handle with localStorage
       if (tenantId === 'demo-tenant') {
         const updatedEvents = events.map(e => 
           e.id === updatedEvent.id ? {...e, ...updatedEvent} : e
         );
         setEvents(updatedEvents);
+        
+        // Save to localStorage
+        localStorage.setItem('demo-tenant-events', JSON.stringify(updatedEvents));
         return;
       }
       
       // Update on server
-      await processAlchemyEvent(tenantId, updatedEvent, 'update');
+      await processCalendarEvent(tenantId, updatedEvent, 'update');
+      console.log('Event updated successfully');
     } catch (error) {
+      console.error('Error updating event:', error);
       alert(`Error updating event: ${error.message}`);
       eventDropInfo.revert();
+    }
+  };
+
+  // Handle event deletion
+  const handleEventRemove = async (removeInfo) => {
+    const { event } = removeInfo;
+    
+    if (window.confirm(`Are you sure you want to delete the event '${event.title}'?`)) {
+      try {
+        // For demo tenant, handle with localStorage
+        if (tenantId === 'demo-tenant') {
+          const updatedEvents = events.filter(e => e.id !== event.id);
+          setEvents(updatedEvents);
+          
+          // Save to localStorage
+          localStorage.setItem('demo-tenant-events', JSON.stringify(updatedEvents));
+          return;
+        }
+        
+        // Delete on server
+        await processCalendarEvent(tenantId, { id: event.id }, 'delete');
+        console.log('Event deleted successfully');
+      } catch (error) {
+        console.error('Error deleting event:', error);
+        alert(`Error deleting event: ${error.message}`);
+        removeInfo.revert();
+      }
+    } else {
+      removeInfo.revert();
     }
   };
 
@@ -158,35 +207,79 @@ function TenantCalendar() {
     setShowWeekends(!showWeekends);
   };
 
+  // Get display name for the tenant
+  const getDisplayName = () => {
+    if (tenantId === 'demo-tenant') {
+      return 'Demo Tenant';
+    } else if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
+      return 'Product CASE UAT';
+    } else {
+      return tenantName || tenantId;
+    }
+  };
+
+  // Reload data from server
+  const handleReloadData = async () => {
+    try {
+      setLoading(true);
+      const tenantData = await fetchTenant(tenantId);
+      
+      if (tenantData) {
+        setEvents(tenantData.events || []);
+        setResources(tenantData.resources || []);
+        if (!tenantName) {
+          setTenantName(tenantData.name || tenantId);
+        }
+      }
+    } catch (error) {
+      console.error('Error reloading data:', error);
+      alert(`Error reloading data: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="dashboard-container">
       <div className="content-header">
-        <h1>{tenantName}</h1>
+        <h1>{getDisplayName()}</h1>
         <div className="header-actions">
           {/* Weekend toggle button */}
           <button 
-            className={`btn btn-sm ${showWeekends ? 'btn-outline-primary' : 'btn-primary'} me-2`}
+            className={`btn ${showWeekends ? 'btn-outline-primary' : 'btn-primary'}`}
             onClick={toggleWeekends}
-            title={showWeekends ? "Hide weekends" : "Show weekends"}
           >
             <i className="fas fa-calendar-week me-1"></i>
             {showWeekends ? "Hide Weekends" : "Show Weekends"}
           </button>
           
+          {/* Reload data button */}
           <button 
-            className="btn btn-sm btn-outline-secondary me-2"
-            onClick={() => navigate('/')}
+            className="btn btn-outline-secondary ms-2"
+            onClick={handleReloadData}
+            title="Reload data from server"
           >
-            <i className="fas fa-arrow-left me-1"></i>Back
+            <i className="fas fa-sync-alt me-1"></i>
+            Reload
           </button>
           
-          {/* Show Admin button if user is authenticated */}
+          {/* Back button */}
+          <button 
+            className="btn btn-outline-secondary ms-2"
+            onClick={() => navigate('/')}
+          >
+            <i className="fas fa-arrow-left me-1"></i>
+            Back
+          </button>
+          
+          {/* Admin button if authenticated */}
           {isAdminAuthenticated && (
             <button 
-              className="btn btn-sm btn-outline-primary"
+              className="btn btn-outline-primary ms-2"
               onClick={() => navigate('/admin')}
             >
-              <i className="fas fa-cog me-1"></i>Admin
+              <i className="fas fa-cog me-1"></i>
+              Admin
             </button>
           )}
         </div>
@@ -223,6 +316,7 @@ function TenantCalendar() {
             select={handleDateSelect}
             eventClick={handleEventClick}
             eventDrop={handleEventDrop}
+            eventRemove={handleEventRemove}
             events={events}
             resources={resources}
             height="auto"
