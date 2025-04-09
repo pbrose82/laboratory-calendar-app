@@ -28,9 +28,15 @@ function TenantCalendar() {
         if (tenantId === 'demo-tenant') {
           setEvents(demoTenantEvents);
           setResources(demoTenantResources);
-          setTenantName('Demo Laboratory');
+          setTenantName('Demo Tenant');
           setLoading(false);
           return;
+        }
+        
+        // Special handling for our Product CASE UAT tenant
+        if (tenantId === 'productcaseelnandlims') {
+          setTenantName('Product CASE UAT Calendar');
+          // We'll still load events from API if available
         }
         
         // Normal tenant handling from API
@@ -40,7 +46,9 @@ function TenantCalendar() {
         if (tenantData) {
           setEvents(tenantData.events || []);
           setResources(tenantData.resources || []);
-          setTenantName(tenantData.name || tenantId);
+          if (!tenantName) {
+            setTenantName(tenantData.name || tenantId);
+          }
         } else {
           setError(`Tenant "${tenantId}" not found`);
         }
@@ -55,7 +63,7 @@ function TenantCalendar() {
     if (tenantId) {
       loadTenantData();
     }
-  }, [tenantId]);
+  }, [tenantId, tenantName]);
 
   const handleDateSelect = async (selectInfo) => {
     const title = prompt('Please enter a new event title:');
@@ -145,16 +153,10 @@ function TenantCalendar() {
 
   return (
     <div className="dashboard-container">
-      {/* Breadcrumbs */}
-      <div className="breadcrumb-container">
-        <ul className="breadcrumb">
-          <li className="breadcrumb-item"><a href="/">Home</a></li>
-          <li className="breadcrumb-item active">{tenantName}</li>
-        </ul>
-      </div>
+      {/* Remove breadcrumbs as requested */}
       
       <div className="content-header">
-        <h1>{tenantName} Calendar</h1>
+        <h1>{tenantName}</h1>
         <div className="header-actions">
           <button 
             className="btn btn-sm btn-outline-secondary"
@@ -163,7 +165,7 @@ function TenantCalendar() {
             <i className="fas fa-arrow-left me-2"></i>Back
           </button>
           
-          {/* Only show Admin button if user is authenticated */}
+          {/* Show Admin button if user is authenticated */}
           {isAdminAuthenticated && (
             <button 
               className="btn btn-sm btn-outline-primary"
@@ -209,6 +211,9 @@ function TenantCalendar() {
             events={events}
             resources={resources}
             height="auto"
+            slotMinTime="06:00:00" // Start calendar at 6am
+            allDaySlot={true}
+            allDayText="all-day"
           />
         </div>
       )}
