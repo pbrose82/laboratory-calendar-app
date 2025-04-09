@@ -22,12 +22,12 @@ export const laboratoryEvents = [
     }
   },
   {
-    title: 'PCR Testing',
+    title: 'HPLC Testing',
     start: '2025-04-11T10:00:00',
     end: '2025-04-11T12:30:00',
     resourceId: 'equipment-3',
     extendedProps: {
-      equipment: 'PCR Machine',
+      equipment: 'HPLC 1',
       technician: 'Dr. Williams',
       sampleType: 'Genetic Screening'
     }
@@ -37,7 +37,7 @@ export const laboratoryEvents = [
 export const laboratoryResources = [
   { id: 'equipment-1', title: 'HPLC Machine' },
   { id: 'equipment-2', title: 'Mass Spectrometer' },
-  { id: 'equipment-3', title: 'PCR Machine' }
+  { id: 'equipment-3', title: 'HPLC 1' }
 ];
 
 // Demo tenant data
@@ -80,14 +80,14 @@ export const demoTenantEvents = [
   },
   {
     id: 'demo-event-4',
-    title: 'DNA Sequencing',
+    title: 'HPLC',
     start: '2025-04-09T13:00:00',
     end: '2025-04-09T17:00:00',
     resourceId: 'demo-equip-4',
     extendedProps: {
-      equipment: 'DNA Sequencer',
+      equipment: 'HPLC 1',
       technician: 'Dr. James Wilson',
-      sampleType: 'Genomic Research'
+      sampleType: 'Chemical'
     }
   },
   {
@@ -108,6 +108,6 @@ export const demoTenantResources = [
   { id: 'demo-equip-1', title: 'Microscope A' },
   { id: 'demo-equip-2', title: 'Ultra Centrifuge B' },
   { id: 'demo-equip-3', title: 'pH Meter C' },
-  { id: 'demo-equip-4', title: 'DNA Sequencer' },
+  { id: 'demo-equip-4', title: 'HPLC 1' },
   { id: 'demo-equip-5', title: 'IR Spectrometer' }
 ];
