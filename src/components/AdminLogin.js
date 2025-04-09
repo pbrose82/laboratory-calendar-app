@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AdminLogin.css';
 
@@ -9,6 +9,14 @@ function AdminLogin() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if already authenticated
+    const adminAuth = sessionStorage.getItem('adminAuthenticated');
+    if (adminAuth === 'true') {
+      navigate('/admin');
+    }
+  }, [navigate]);
 
   // Admin password - in a real app, this would be server-side
   // For demo purposes, we're using a simple password
