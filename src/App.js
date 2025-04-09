@@ -1,20 +1,22 @@
 import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LaboratoryCalendar from './components/LaboratoryCalendar';
+import AdminPage from './components/AdminPage';
+import TenantCalendar from './components/TenantCalendar';
+import AppLayout from './components/AppLayout';
 import './App.css';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>Laboratory Resource Calendar</h1>
-      </header>
-      <main>
-        <LaboratoryCalendar />
-      </main>
-      <footer>
-        <p>© 2024 Laboratory Management System</p>
-      </footer>
-    </div>
+    <Router>
+      <AppLayout>
+        <Routes>
+          <Route path="/" element={<LaboratoryCalendar />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/:tenantId" element={<TenantCalendar />} />
+        </Routes>
+      </AppLayout>
+    </Router>
   );
 }
 
