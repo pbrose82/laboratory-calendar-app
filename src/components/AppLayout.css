@@ -1,16 +1,16 @@
 /* AppLayout.css - Styles for the layout with left navigation */
 
 :root {
-  --nav-width: 240px;
-  --header-height: 60px;
-  --primary-color: #0047BB;
-  --secondary-color: #3F88F6;
-  --nav-bg: #2c3e50;
-  --nav-text: #ecf0f1;
-  --nav-active: #3498db;
-  --body-bg: #f4f6f9;
-  --content-bg: #ffffff;
-  --border-color: #e0e0e0;
+  --alchemy-blue: #0052CC;
+  --alchemy-dark-blue: #0747A6;
+  --alchemy-hover: rgba(255, 255, 255, 0.1);
+  --alchemy-active: rgba(255, 255, 255, 0.2);
+  --alchemy-text: #FFF;
+  --alchemy-light-text: rgba(255, 255, 255, 0.7);
+  --body-bg: #F4F5F7;
+  --content-bg: #FFFFFF;
+  --border-color: #E9EAEC;
+  --nav-width: 255px;
 }
 
 /* Basic Reset */
@@ -21,9 +21,10 @@
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
   background-color: var(--body-bg);
   min-height: 100vh;
+  color: #172B4D;
 }
 
 /* Container Layout */
@@ -35,106 +36,229 @@ body {
 /* Left Navigation Styles */
 .left-nav {
   width: var(--nav-width);
-  background-color: var(--nav-bg);
-  color: var(--nav-text);
+  background-color: var(--alchemy-blue);
+  color: var(--alchemy-text);
   position: fixed;
   height: 100vh;
   display: flex;
   flex-direction: column;
   z-index: 100;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
 }
 
 .nav-header {
-  padding: 20px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-header-title {
+  display: flex;
+  align-items: center;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.nav-header-title i {
+  margin-right: 8px;
+  font-size: 20px;
+}
+
+.nav-dropdown-btn {
+  background: none;
+  border: none;
+  color: var(--alchemy-text);
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.nav-logo {
-  height: 40px;
-  max-width: 100%;
+.search-container {
+  padding: 0 16px 12px;
+}
+
+.search-input {
+  position: relative;
+  width: 100%;
+}
+
+.search-input input {
+  background-color: rgba(0, 0, 0, 0.2);
+  border: none;
+  border-radius: 4px;
+  color: var(--alchemy-text);
+  padding: 8px 12px 8px 32px;
+  width: 100%;
+  font-size: 14px;
+}
+
+.search-input input::placeholder {
+  color: var(--alchemy-light-text);
+}
+
+.search-input input:focus {
+  outline: none;
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--alchemy-light-text);
+  font-size: 14px;
+}
+
+.new-btn-container {
+  padding: 0 16px 16px;
+}
+
+.new-btn {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  color: var(--alchemy-text);
+  cursor: pointer;
+  padding: 8px 12px;
+  width: 100%;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.new-btn:hover {
+  background-color: var(--alchemy-hover);
+}
+
+.new-btn i {
+  margin-right: 8px;
 }
 
 .nav-menu {
-  padding: 20px 0;
   flex-grow: 1;
   overflow-y: auto;
 }
 
-.nav-menu ul {
+.nav-menu ul, .admin-menu {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.nav-menu li {
-  margin-bottom: 5px;
+.nav-menu li, .admin-menu li {
+  margin: 2px 0;
 }
 
-.nav-menu a {
+.nav-menu a, .admin-menu a {
   display: flex;
   align-items: center;
-  padding: 10px 15px;
-  color: var(--nav-text);
+  padding: 8px 16px;
+  color: var(--alchemy-text);
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s;
+  font-size: 14px;
 }
 
-.nav-menu a:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+.nav-menu a:hover, .admin-menu a:hover {
+  background-color: var(--alchemy-hover);
 }
 
-.nav-menu li.active a {
-  background-color: var(--nav-active);
-  color: white;
-  border-left: 3px solid white;
+.nav-menu li.active a, .admin-menu li.active a {
+  background-color: var(--alchemy-active);
+  font-weight: 500;
 }
 
 .nav-menu i {
-  margin-right: 10px;
+  margin-right: 8px;
+  width: 20px;
+  text-align: center;
+  font-size: 16px;
+}
+
+.nav-divider {
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.1);
+  margin: 16px 16px;
+}
+
+.tenant-nav-item {
+  padding-left: 4px;
+}
+
+/* Admin section at bottom */
+.admin-section {
+  margin-top: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.admin-header:hover {
+  background-color: var(--alchemy-hover);
+}
+
+.admin-header.expanded {
+  background-color: var(--alchemy-active);
+}
+
+.admin-title {
+  display: flex;
+  align-items: center;
+}
+
+.admin-title i {
+  margin-right: 8px;
   width: 20px;
   text-align: center;
 }
 
-.nav-divider {
-  padding: 15px 15px 5px;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+.admin-menu {
+  padding: 4px 0;
 }
 
-.tenant-nav-item {
-  margin-left: 10px;
+.admin-menu a {
+  padding-left: 44px;
 }
 
 .nav-footer {
-  padding: 15px;
+  padding: 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-.help-button {
+.user-indicator {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: white;
+  color: var(--alchemy-blue);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  padding: 10px;
-  background-color: rgba(255, 255, 255, 0.1);
-  border: none;
-  border-radius: 5px;
-  color: var(--nav-text);
-  cursor: pointer;
-  transition: all 0.2s ease;
+  font-weight: 600;
+  font-size: 14px;
 }
 
-.help-button:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
-.help-button i {
-  margin-right: 8px;
+.copyright {
+  font-size: 11px;
+  color: var(--alchemy-light-text);
+  text-align: center;
 }
 
 /* Main Content Styles */
@@ -144,101 +268,66 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  padding: 24px;
 }
 
 .content-wrapper {
-  padding: 20px;
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-}
-
-/* For small screens, collapse the menu */
-@media (max-width: 768px) {
-  .left-nav {
-    width: 60px;
-  }
-  
-  .nav-menu a span, 
-  .nav-menu .nav-divider span,
-  .help-button span {
-    display: none;
-  }
-  
-  .main-content {
-    margin-left: 60px;
-    width: calc(100% - 60px);
-  }
-  
-  .nav-menu a {
-    justify-content: center;
-    padding: 15px 0;
-  }
-  
-  .nav-menu i {
-    margin-right: 0;
-    font-size: 1.2rem;
-  }
-  
-  .tenant-nav-item {
-    margin-left: 0;
-  }
 }
 
 /* Laboratory calendar specific overrides */
 .laboratory-calendar {
   width: 100%;
   height: 100%;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 20px;
   flex-grow: 1;
 }
 
 /* Header styles within content */
 .content-header {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.content-header h1, 
-.content-header h2 {
-  color: var(--primary-color);
+.content-header h1 {
+  font-size: 20px;
   font-weight: 500;
+  color: #172B4D;
 }
 
-/* Breadcrumb styles */
-.breadcrumb-container {
-  background-color: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
-  padding: 10px 20px;
-  margin-bottom: 20px;
+/* Calendar container styling */
+.dashboard-container {
+  width: 100%;
 }
 
-.breadcrumb {
-  display: flex;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
+/* Responsive styles */
+@media (max-width: 768px) {
+  :root {
+    --nav-width: 60px;
+  }
 
-.breadcrumb-item {
-  display: flex;
-  align-items: center;
-}
+  .left-nav {
+    width: var(--nav-width);
+  }
 
-.breadcrumb-item:not(:first-child)::before {
-  content: '/';
-  margin: 0 10px;
-  color: #6c757d;
-}
+  .nav-header-title span,
+  .search-container,
+  .new-btn span,
+  .nav-menu a span,
+  .admin-title span,
+  .copyright {
+    display: none;
+  }
 
-.breadcrumb-item a {
-  color: var(--primary-color);
-  text-decoration: none;
-}
-
-.breadcrumb-item.active {
-  color: #6c757d;
+  .main-content {
+    margin-left: var(--nav-width);
+    width: calc(100% - var(--nav-width));
+  }
 }
