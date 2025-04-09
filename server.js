@@ -1,4 +1,4 @@
-// server.js - Optimized for Render disk persistence
+// server.js - Optimized for Render deployment
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
@@ -11,6 +11,12 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+
+// Add request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url} - IP: ${req.ip}`);
+  next();
+});
 
 // Data persistence configuration specifically for Render
 // This directory should be mounted as a persistent volume in Render
@@ -77,105 +83,242 @@ loadTenantData();
 app.use(express.static(path.join(__dirname, 'build')));
 
 /**
- * API endpoint to handle calendar events for tenants
+ * Enhanced API endpoint to handle multiple formats of calendar events
  */
 app.post('/api/calendar-events', (req, res) => {
   try {
-    const { tenantId, eventData, action } = req.body;
+    // Log the incoming request for debugging
+    console.log('Calendar event request received:');
+    console.log('Headers:', JSON.stringify(req.headers));
+    console.log('Body:', JSON.stringify(req.body));
     
-    // Validate required fields
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID is required' });
-    }
+    const body = req.body;
     
-    if (!eventData) {
-      return res.status(400).json({ error: 'Event data is required' });
-    }
-    
-    if (!action) {
-      return res.status(400).json({ error: 'Action is required' });
-    }
-    
-    // Check if tenant exists, create if it doesn't
-    if (!tenants[tenantId]) {
-      tenants[tenantId] = {
-        id: tenantId,
-        name: getDisplayName(tenantId),
-        createdAt: new Date().toISOString(),
-        events: [],
-        resources: [
-          { id: 'equipment-1', title: 'HPLC Machine' },
-          { id: 'equipment-2', title: 'Mass Spectrometer' },
-          { id: 'equipment-3', title: 'PCR Machine' }
-        ]
+    // Check if we have the hybrid format (title, action, tenantId directly at root)
+    if (body.title && body.action === 'create' && body.tenantId && body.start && body.end) {
+      console.log('Detected hybrid format from Alchemy');
+      const tenantId = body.tenantId;
+      
+      // Transform to our standard format
+      const eventData = {
+        title: body.title,
+        start: body.start,
+        end: body.end,
+        allDay: false,
+        extendedProps: {
+          location: body.location,
+          reminders: body.reminders
+        }
       };
-    }
-    
-    // Initialize events array if it doesn't exist
-    if (!tenants[tenantId].events) {
-      tenants[tenantId].events = [];
-    }
-    
-    let result;
-    
-    switch (action) {
-      case 'create':
-        // Generate ID if none exists
-        if (!eventData.id) {
-          eventData.id = Date.now().toString();
-        }
-        
-        tenants[tenantId].events.push(eventData);
-        result = eventData;
-        break;
-        
-      case 'update':
-        if (!eventData.id) {
-          return res.status(400).json({ error: 'Event ID is required for update operation' });
-        }
-        
-        const eventIndex = tenants[tenantId].events.findIndex(event => event.id === eventData.id);
-        
-        if (eventIndex === -1) {
-          return res.status(404).json({ error: `Event "${eventData.id}" not found for tenant "${tenantId}"` });
-        }
-        
-        tenants[tenantId].events[eventIndex] = {
-          ...tenants[tenantId].events[eventIndex],
-          ...eventData
+      
+      // Create tenant if needed
+      if (!tenants[tenantId]) {
+        console.log(`Creating new tenant: ${tenantId}`);
+        tenants[tenantId] = {
+          id: tenantId,
+          name: tenantId,
+          createdAt: new Date().toISOString(),
+          events: [],
+          resources: [
+            { id: 'equipment-1', title: 'HPLC Machine' },
+            { id: 'equipment-2', title: 'Mass Spectrometer' },
+            { id: 'equipment-3', title: 'PCR Machine' }
+          ]
         };
-        
-        result = tenants[tenantId].events[eventIndex];
-        break;
-        
-      case 'delete':
-        if (!eventData.id) {
-          return res.status(400).json({ error: 'Event ID is required for delete operation' });
+      }
+      
+      // Initialize events array if it doesn't exist
+      if (!tenants[tenantId].events) {
+        tenants[tenantId].events = [];
+      }
+      
+      // Generate ID if none exists
+      eventData.id = Date.now().toString();
+      
+      // Add to events
+      tenants[tenantId].events.push(eventData);
+      
+      // Save tenant data after modification
+      const saveSuccess = saveTenantData();
+      
+      console.log(`Processed hybrid format event for tenant ${tenantId}, save success: ${saveSuccess}`);
+      return res.json({ 
+        success: true, 
+        data: eventData,
+        message: "Event created from hybrid format"
+      });
+    } 
+    // Check if this is the legacy Google Calendar format (has calendarId, summary)
+    else if (body.calendarId && body.summary) {
+      console.log('Received legacy Google Calendar format request');
+      
+      // Extract tenant ID from the description or use a default
+      const tenantId = body.tenantId || 'default-tenant';
+      
+      // Transform to our internal format
+      const eventData = {
+        title: body.summary,
+        start: body.StartUse,  // Use the original field names
+        end: body.EndUse,
+        allDay: false,
+        resourceId: body.resourceId || 'equipment-1',
+        extendedProps: {
+          location: body.location,
+          description: body.description,
+          timeZone: body.timeZone,
+          reminders: body.reminders
         }
-        
-        const initialLength = tenants[tenantId].events.length;
-        tenants[tenantId].events = tenants[tenantId].events.filter(event => event.id !== eventData.id);
-        
-        if (tenants[tenantId].events.length === initialLength) {
-          return res.status(404).json({ error: `Event "${eventData.id}" not found for tenant "${tenantId}"` });
-        }
-        
-        result = { id: eventData.id, deleted: true };
-        break;
-        
-      default:
-        return res.status(400).json({ error: `Invalid action: ${action}` });
+      };
+      
+      // Check if tenant exists, create if it doesn't
+      if (!tenants[tenantId]) {
+        tenants[tenantId] = {
+          id: tenantId,
+          name: tenantId,
+          createdAt: new Date().toISOString(),
+          events: [],
+          resources: [
+            { id: 'equipment-1', title: 'HPLC Machine' },
+            { id: 'equipment-2', title: 'Mass Spectrometer' },
+            { id: 'equipment-3', title: 'PCR Machine' }
+          ]
+        };
+      }
+      
+      // Initialize events array if it doesn't exist
+      if (!tenants[tenantId].events) {
+        tenants[tenantId].events = [];
+      }
+      
+      // Generate ID if none exists
+      if (!eventData.id) {
+        eventData.id = Date.now().toString();
+      }
+      
+      // Add to events
+      tenants[tenantId].events.push(eventData);
+      
+      // Save tenant data after modification
+      saveTenantData();
+      
+      console.log(`Processed legacy event for tenant ${tenantId}`);
+      return res.json({ 
+        success: true, 
+        data: eventData,
+        message: "Event created from legacy format"
+      });
+    } 
+    // Standard API format
+    else if (body.tenantId && body.action && body.eventData) {
+      console.log('Received standard API format request');
+      const { tenantId, eventData, action } = body;
+      
+      // Validate required fields
+      if (!tenantId) {
+        return res.status(400).json({ error: 'Tenant ID is required' });
+      }
+      
+      if (!eventData) {
+        return res.status(400).json({ error: 'Event data is required' });
+      }
+      
+      if (!action) {
+        return res.status(400).json({ error: 'Action is required' });
+      }
+      
+      // Check if tenant exists, create if it doesn't
+      if (!tenants[tenantId]) {
+        tenants[tenantId] = {
+          id: tenantId,
+          name: tenantId,
+          createdAt: new Date().toISOString(),
+          events: [],
+          resources: [
+            { id: 'equipment-1', title: 'HPLC Machine' },
+            { id: 'equipment-2', title: 'Mass Spectrometer' },
+            { id: 'equipment-3', title: 'PCR Machine' }
+          ]
+        };
+      }
+      
+      // Initialize events array if it doesn't exist
+      if (!tenants[tenantId].events) {
+        tenants[tenantId].events = [];
+      }
+      
+      let result;
+      
+      switch (action) {
+        case 'create':
+          // Generate ID if none exists
+          if (!eventData.id) {
+            eventData.id = Date.now().toString();
+          }
+          
+          tenants[tenantId].events.push(eventData);
+          result = eventData;
+          break;
+          
+        case 'update':
+          if (!eventData.id) {
+            return res.status(400).json({ error: 'Event ID is required for update operation' });
+          }
+          
+          const eventIndex = tenants[tenantId].events.findIndex(event => event.id === eventData.id);
+          
+          if (eventIndex === -1) {
+            return res.status(404).json({ error: `Event "${eventData.id}" not found for tenant "${tenantId}"` });
+          }
+          
+          tenants[tenantId].events[eventIndex] = {
+            ...tenants[tenantId].events[eventIndex],
+            ...eventData
+          };
+          
+          result = tenants[tenantId].events[eventIndex];
+          break;
+          
+        case 'delete':
+          if (!eventData.id) {
+            return res.status(400).json({ error: 'Event ID is required for delete operation' });
+          }
+          
+          const initialLength = tenants[tenantId].events.length;
+          tenants[tenantId].events = tenants[tenantId].events.filter(event => event.id !== eventData.id);
+          
+          if (tenants[tenantId].events.length === initialLength) {
+            return res.status(404).json({ error: `Event "${eventData.id}" not found for tenant "${tenantId}"` });
+          }
+          
+          result = { id: eventData.id, deleted: true };
+          break;
+          
+        default:
+          return res.status(400).json({ error: `Invalid action: ${action}` });
+      }
+      
+      // Save tenant data after modification
+      const saveSuccess = saveTenantData();
+      
+      console.log(`Processed ${action} for tenant ${tenantId}, save success: ${saveSuccess}`);
+      return res.json({ 
+        success: true, 
+        data: result,
+        message: `Event ${action}d successfully`
+      });
     }
-    
-    // Save tenant data after modification to persistent disk
-    const saveSuccess = saveTenantData();
-    
-    console.log(`Processed ${action} for tenant ${tenantId}`);
-    return res.json({ 
-      success: true, 
-      data: result
-    });
-    
+    else {
+      console.log('Invalid request format received:', body);
+      return res.status(400).json({ 
+        error: 'Invalid request format',
+        received: body,
+        expectedFormats: [
+          "Standard API format: {tenantId, action, eventData}",
+          "Hybrid format: {title, action, tenantId, start, end}",
+          "Legacy format: {calendarId, summary, StartUse, EndUse}"
+        ]
+      });
+    }
   } catch (error) {
     console.error('Error handling calendar event:', error);
     return res.status(500).json({ error: error.message });
@@ -279,16 +422,169 @@ app.delete('/api/tenants/:tenantId', (req, res) => {
   }
 });
 
-// Helper function to get display name for a tenant ID
-function getDisplayName(tenantId) {
-  if (tenantId === 'demo-tenant') {
-    return 'Demo Tenant';
-  } else if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
-    return 'Product CASE UAT';
-  } else {
-    return tenantId;
+/**
+ * API endpoint to list calendar events for a tenant
+ */
+app.get('/api/calendar-events', (req, res) => {
+  try {
+    const { tenantId, startDate, endDate, resourceId } = req.query;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID is required' });
+    }
+    
+    if (!tenants[tenantId]) {
+      return res.status(404).json({ error: `Tenant "${tenantId}" not found` });
+    }
+    
+    let events = tenants[tenantId].events || [];
+    
+    // Apply filters if provided
+    if (startDate || endDate || resourceId) {
+      events = events.filter(event => {
+        let match = true;
+        
+        if (startDate) {
+          const eventEnd = new Date(event.end);
+          const filterStart = new Date(startDate);
+          if (eventEnd < filterStart) match = false;
+        }
+        
+        if (endDate) {
+          const eventStart = new Date(event.start);
+          const filterEnd = new Date(endDate);
+          filterEnd.setHours(23, 59, 59, 999); // End of day
+          if (eventStart > filterEnd) match = false;
+        }
+        
+        if (resourceId && event.resourceId !== resourceId) {
+          match = false;
+        }
+        
+        return match;
+      });
+    }
+    
+    return res.json({ 
+      success: true, 
+      data: events,
+      count: events.length
+    });
+  } catch (error) {
+    console.error('Error listing calendar events:', error);
+    return res.status(500).json({ error: error.message });
   }
-}
+});
+
+/**
+ * API endpoint to get a specific calendar event
+ */
+app.get('/api/calendar-events/:eventId', (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { tenantId } = req.query;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID is required' });
+    }
+    
+    if (!tenants[tenantId]) {
+      return res.status(404).json({ error: `Tenant "${tenantId}" not found` });
+    }
+    
+    const event = tenants[tenantId].events?.find(e => e.id === eventId);
+    
+    if (!event) {
+      return res.status(404).json({ error: `Event "${eventId}" not found for tenant "${tenantId}"` });
+    }
+    
+    return res.json({ 
+      success: true, 
+      data: event
+    });
+  } catch (error) {
+    console.error('Error getting calendar event:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * API endpoint to update a specific calendar event
+ */
+app.put('/api/calendar-events/:eventId', (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { tenantId, ...updateData } = req.body;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID is required' });
+    }
+    
+    if (!tenants[tenantId]) {
+      return res.status(404).json({ error: `Tenant "${tenantId}" not found` });
+    }
+    
+    const eventIndex = tenants[tenantId].events?.findIndex(e => e.id === eventId);
+    
+    if (eventIndex === -1) {
+      return res.status(404).json({ error: `Event "${eventId}" not found for tenant "${tenantId}"` });
+    }
+    
+    tenants[tenantId].events[eventIndex] = {
+      ...tenants[tenantId].events[eventIndex],
+      ...updateData
+    };
+    
+    // Save tenant data after modification
+    saveTenantData();
+    
+    return res.json({ 
+      success: true, 
+      data: tenants[tenantId].events[eventIndex],
+      message: "Event updated successfully"
+    });
+  } catch (error) {
+    console.error('Error updating calendar event:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * API endpoint to delete a specific calendar event
+ */
+app.delete('/api/calendar-events/:eventId', (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { tenantId } = req.query;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID is required' });
+    }
+    
+    if (!tenants[tenantId]) {
+      return res.status(404).json({ error: `Tenant "${tenantId}" not found` });
+    }
+    
+    const initialLength = tenants[tenantId].events?.length || 0;
+    tenants[tenantId].events = tenants[tenantId].events?.filter(e => e.id !== eventId) || [];
+    
+    if (tenants[tenantId].events.length === initialLength) {
+      return res.status(404).json({ error: `Event "${eventId}" not found for tenant "${tenantId}"` });
+    }
+    
+    // Save tenant data after modification
+    saveTenantData();
+    
+    return res.json({ 
+      success: true, 
+      data: { id: eventId, deleted: true },
+      message: "Event deleted successfully"
+    });
+  } catch (error) {
+    console.error('Error deleting calendar event:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
 
 /**
  * The "catchall" handler: for any request that doesn't
