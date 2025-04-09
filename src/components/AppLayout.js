@@ -31,6 +31,17 @@ function AppLayout({ children }) {
 
   const isAdminArea = location.pathname === '/admin' || location.pathname === '/admin-login';
 
+  // Get current tenant name for display
+  const getTenantName = () => {
+    if (tenantId === 'demo-tenant') {
+      return 'Demo Tenant';
+    } else if (tenantId === 'productcaseelnandlims') {
+      return 'Product CASE UAT Calendar';
+    } else {
+      return tenantId ? `${tenantId} Calendar` : '';
+    }
+  };
+
   return (
     <div className="app-container">
       {/* Left Navigation - Alchemized version */}
@@ -60,7 +71,7 @@ function AppLayout({ children }) {
               )}
             </div>
 
-            {/* Search box - transparent background, no white */}
+            {/* Search box */}
             <div className={`search-transparent ${isExpanded ? 'search-wide' : 'search-narrow'}`}>
               <i className="fas fa-search search-icon"></i>
               {isExpanded && (
@@ -70,8 +81,6 @@ function AppLayout({ children }) {
                   className="search-input-transparent"/>
               )}
             </div>
-
-            {/* Removed New button as requested */}
           </div>
 
           {/* Navigation Menu */}
@@ -87,7 +96,7 @@ function AppLayout({ children }) {
               </Link>
 
               <Link to="/"
-                    className="c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-margin-bottom-m u-padding-top-xs u-1/1 u-padding-horizontal-l"
+                    className="c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l"
                     title={isExpanded ? null : 'My Assignments'}>
                 <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
                   <i className="fas fa-tasks u-color-white-opacity-72"></i>
@@ -95,69 +104,59 @@ function AppLayout({ children }) {
                 {isExpanded && <span className="t-4">My Assignments</span>}
               </Link>
               
-              {/* Demo tenant always visible */}
-              <Link to="/demo-tenant" 
-                    className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-margin-bottom-m u-padding-top-xs u-1/1 u-padding-horizontal-l ${location.pathname === '/demo-tenant' ? 'c-selectable-item__dark--active' : ''}`}
-                    title={isExpanded ? null : 'Demo Tenant'}>
-                <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
-                  <i className="fas fa-flask u-color-white-opacity-72"></i>
-                </div>
-                {isExpanded && <span className="t-4">Demo Tenant</span>}
-              </Link>
-              
-              {/* Other tenant in nav if accessing directly via URL */}
-              {tenantId && tenantId !== 'demo-tenant' && (
+              {/* Show only the current tenant in navigation */}
+              {tenantId && (
                 <Link to={`/${tenantId}`}
-                      className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-margin-bottom-m u-padding-top-xs u-1/1 u-padding-horizontal-l ${location.pathname === `/${tenantId}` ? 'c-selectable-item__dark--active' : ''}`}
-                      title={isExpanded ? null : `${tenantId} Calendar`}>
+                      className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l c-selectable-item__dark--active`}
+                      title={isExpanded ? null : getTenantName()}>
                   <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
                     <i className="fas fa-calendar u-color-white-opacity-72"></i>
                   </div>
-                  {isExpanded && <span className="t-4">{tenantId} Calendar</span>}
-                </Link>
-              )}
-            </div>
-
-            {/* Admin section at bottom */}
-            {isExpanded && (
-              <div className="admin-section-header">
-                <h3>ADMINISTRATION</h3>
-              </div>
-            )}
-
-            {/* Admin menu items */}
-            <div className="admin-section">
-              {isAdminAuthenticated ? (
-                <>
-                  <Link to="/admin"
-                        className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${isAdminArea ? 'c-selectable-item__dark--active' : ''}`}
-                        title={isExpanded ? null : 'Manage Tenants'}>
-                    <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
-                      <i className="fas fa-cog u-color-white-opacity-72"></i>
-                    </div>
-                    {isExpanded && <span className="t-4">Manage Tenants</span>}
-                  </Link>
-                  
-                  <button onClick={handleLogout}
-                          className="c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l c-admin-btn">
-                    <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
-                      <i className="fas fa-sign-out-alt u-color-white-opacity-72"></i>
-                    </div>
-                    {isExpanded && <span className="t-4">Logout</span>}
-                  </button>
-                </>
-              ) : (
-                <Link to="/admin-login"
-                      className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${isAdminArea ? 'c-selectable-item__dark--active' : ''}`}
-                      title={isExpanded ? null : 'Admin Login'}>
-                  <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
-                    <i className="fas fa-lock u-color-white-opacity-72"></i>
-                  </div>
-                  {isExpanded && <span className="t-4">Admin Login</span>}
+                  {isExpanded && <span className="t-4">{getTenantName()}</span>}
                 </Link>
               )}
             </div>
           </div>
+        </div>
+
+        {/* Admin section header */}
+        {isExpanded && (
+          <div className="admin-header">
+            <span>ADMINISTRATION</span>
+          </div>
+        )}
+        
+        {/* Admin section */}
+        <div className="admin-menu">
+          {isAdminAuthenticated ? (
+            <>
+              <Link to="/admin"
+                    className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${isAdminArea ? 'c-selectable-item__dark--active' : ''}`}
+                    title={isExpanded ? null : 'Manage Tenants'}>
+                <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                  <i className="fas fa-cog u-color-white-opacity-72"></i>
+                </div>
+                {isExpanded && <span className="t-4">Manage Tenants</span>}
+              </Link>
+              
+              <button onClick={handleLogout}
+                      className="c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l c-admin-btn">
+                <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                  <i className="fas fa-sign-out-alt u-color-white-opacity-72"></i>
+                </div>
+                {isExpanded && <span className="t-4">Logout</span>}
+              </button>
+            </>
+          ) : (
+            <Link to="/admin-login"
+                  className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${isAdminArea ? 'c-selectable-item__dark--active' : ''}`}
+                  title={isExpanded ? null : 'Admin Login'}>
+              <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                <i className="fas fa-lock u-color-white-opacity-72"></i>
+              </div>
+              {isExpanded && <span className="t-4">Admin Login</span>}
+            </Link>
+          )}
         </div>
 
         {/* Footer copyright */}
