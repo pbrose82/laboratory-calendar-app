@@ -14,8 +14,13 @@ function TenantCalendar() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tenantName, setTenantName] = useState('');
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
 
   useEffect(() => {
+    // Check if admin is authenticated
+    const adminAuth = sessionStorage.getItem('adminAuthenticated');
+    setIsAdminAuthenticated(adminAuth === 'true');
+    
     async function loadTenantData() {
       try {
         setLoading(true);
@@ -131,12 +136,15 @@ function TenantCalendar() {
             <i className="fas fa-arrow-left me-2"></i>Back
           </button>
           
-          <button 
-            className="btn btn-sm btn-outline-primary"
-            onClick={() => navigate('/admin')}
-          >
-            <i className="fas fa-cog me-2"></i>Admin
-          </button>
+          {/* Only show Admin button if user is authenticated */}
+          {isAdminAuthenticated && (
+            <button 
+              className="btn btn-sm btn-outline-primary"
+              onClick={() => navigate('/admin')}
+            >
+              <i className="fas fa-cog me-2"></i>Admin
+            </button>
+          )}
         </div>
       </div>
       
