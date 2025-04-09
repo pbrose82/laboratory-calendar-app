@@ -1,0 +1,74 @@
+.api-documentation {
+  padding: 0;
+  width: 100%;
+}
+
+.api-documentation .content-header {
+  margin-bottom: 24px;
+}
+
+.api-documentation .content-header h1 {
+  font-size: 1.8rem;
+  font-weight: 500;
+  margin: 0;
+  color: #1565C0;
+}
+
+.api-documentation .subtitle {
+  margin-top: 8px;
+  color: #6c757d;
+  font-size: 1rem;
+}
+
+.swagger-container {
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 0;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+/* Override Swagger UI Styles */
+.swagger-ui .topbar {
+  background-color: #1565C0 !important;
+  padding: 15px 0;
+}
+
+.swagger-ui .info {
+  margin: 20px 0;
+}
+
+.swagger-ui .opblock-tag {
+  font-size: 16px !important;
+  margin: 10px 0 !important;
+}
+
+.swagger-ui .opblock .opblock-summary-method {
+  font-weight: 600;
+}
+
+.swagger-ui .opblock {
+  margin: 0 0 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.swagger-ui .opblock-tag:hover {
+  background-color: rgba(21, 101, 192, 0.05);
+}
+
+.swagger-ui .opblock-tag-section {
+  margin-bottom: 24px;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .swagger-container {
+    border-radius: 0;
+    box-shadow: none;
+  }
+  
+  .swagger-ui .opblock .opblock-summary {
+    flex-wrap: wrap;
+  }
+}
