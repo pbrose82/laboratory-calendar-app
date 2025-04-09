@@ -31,14 +31,16 @@ function AppLayout({ children }) {
 
   const isAdminArea = location.pathname === '/admin' || location.pathname === '/admin-login';
 
-  // Get current tenant name for display
-  const getTenantName = () => {
+  // Get formatted tenant display name - avoid showing the technical ID
+  const getTenantDisplayName = () => {
     if (tenantId === 'demo-tenant') {
       return 'Demo Tenant';
+    } else if (tenantId === 'productcaseelnlims4uat') {
+      return 'Product CASE UAT';
     } else if (tenantId === 'productcaseelnandlims') {
-      return 'Product CASE UAT Calendar';
+      return 'Product CASE UAT';
     } else {
-      return tenantId ? `${tenantId} Calendar` : '';
+      return tenantId ? `${tenantId}` : '';
     }
   };
 
@@ -104,15 +106,15 @@ function AppLayout({ children }) {
                 {isExpanded && <span className="t-4">My Assignments</span>}
               </Link>
               
-              {/* Show only the current tenant in navigation */}
+              {/* Show only the current tenant in navigation with a user-friendly name */}
               {tenantId && (
                 <Link to={`/${tenantId}`}
                       className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l c-selectable-item__dark--active`}
-                      title={isExpanded ? null : getTenantName()}>
+                      title={isExpanded ? null : `${getTenantDisplayName()}`}>
                   <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
                     <i className="fas fa-calendar u-color-white-opacity-72"></i>
                   </div>
-                  {isExpanded && <span className="t-4">{getTenantName()}</span>}
+                  {isExpanded && <span className="t-4">{getTenantDisplayName()}</span>}
                 </Link>
               )}
             </div>
