@@ -5,6 +5,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { fetchTenant, processAlchemyEvent } from '../services/apiClient';
+import { demoTenantEvents, demoTenantResources } from '../data/sample-events';
 
 function TenantCalendar() {
   const { tenantId } = useParams();
@@ -23,6 +24,16 @@ function TenantCalendar() {
     
     async function loadTenantData() {
       try {
+        // Special handling for demo tenant
+        if (tenantId === 'demo-tenant') {
+          setEvents(demoTenantEvents);
+          setResources(demoTenantResources);
+          setTenantName('Demo Laboratory');
+          setLoading(false);
+          return;
+        }
+        
+        // Normal tenant handling from API
         setLoading(true);
         const tenantData = await fetchTenant(tenantId);
         
@@ -64,6 +75,13 @@ function TenantCalendar() {
         resourceId: resources.length > 0 ? resources[0].id : undefined
       };
       
+      // For demo tenant, just add to state
+      if (tenantId === 'demo-tenant') {
+        setEvents(prevEvents => [...prevEvents, newEvent]);
+        calendarApi.addEvent(newEvent);
+        return;
+      }
+      
       // Process through API to save to backend
       const savedEvent = await processAlchemyEvent(tenantId, newEvent, 'create');
       
@@ -79,10 +97,10 @@ function TenantCalendar() {
 
   const handleEventClick = (clickInfo) => {
     const event = clickInfo.event;
-    const extendedProps = event.extendedProps;
+    const extendedProps = event.extendedProps || {};
     
     // Find the resource title if a resourceId is assigned
-    const resourceTitle = resources.find(r => r.id === event.extendedProps.resourceId)?.title || 'None';
+    const resourceTitle = resources.find(r => r.id === extendedProps.resourceId)?.title || 'None';
 
     alert(`
       Event Details:
@@ -107,6 +125,15 @@ function TenantCalendar() {
         start: event.startStr,
         end: event.endStr
       };
+      
+      // For demo tenant, just update local state
+      if (tenantId === 'demo-tenant') {
+        const updatedEvents = events.map(e => 
+          e.id === updatedEvent.id ? {...e, ...updatedEvent} : e
+        );
+        setEvents(updatedEvents);
+        return;
+      }
       
       // Update on server
       await processAlchemyEvent(tenantId, updatedEvent, 'update');
