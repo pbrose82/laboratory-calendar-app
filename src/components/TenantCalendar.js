@@ -8,6 +8,41 @@ import { fetchTenant, processCalendarEvent } from '../services/apiClient';
 import { demoTenantEvents, demoTenantResources } from '../data/sample-events';
 import './TenantCalendar.css';
 
+// ADDED: Helper function defined outside of component to avoid linting errors
+const ensureISODateFormat = (events) => {
+  if (!Array.isArray(events)) return [];
+  
+  return events.map(event => {
+    const newEvent = { ...event };
+    
+    // Check if start is not already in ISO format
+    if (event.start && typeof event.start === 'string' && !event.start.includes('T')) {
+      try {
+        const startDate = new Date(event.start);
+        if (!isNaN(startDate.getTime())) {
+          newEvent.start = startDate.toISOString();
+        }
+      } catch (e) {
+        console.warn(`Failed to parse start date: ${event.start}`);
+      }
+    }
+    
+    // Check if end is not already in ISO format
+    if (event.end && typeof event.end === 'string' && !event.end.includes('T')) {
+      try {
+        const endDate = new Date(event.end);
+        if (!isNaN(endDate.getTime())) {
+          newEvent.end = endDate.toISOString();
+        }
+      } catch (e) {
+        console.warn(`Failed to parse end date: ${event.end}`);
+      }
+    }
+    
+    return newEvent;
+  });
+};
+
 function TenantCalendar() {
   const { tenantId } = useParams();
   const navigate = useNavigate();
@@ -55,9 +90,12 @@ function TenantCalendar() {
         
         if (tenantData) {
           console.log('Loaded tenant data:', tenantData);
+          
+          // MODIFIED - Process events to ensure ISO date format
           const formattedEvents = ensureISODateFormat(tenantData.events || []);
           console.log('Events after date format validation:', formattedEvents);
           setEvents(formattedEvents);
+          
           setResources(tenantData.resources || []);
           if (!tenantName) {
             setTenantName(tenantData.name || tenantId);
@@ -227,7 +265,8 @@ function TenantCalendar() {
       const tenantData = await fetchTenant(tenantId);
       
       if (tenantData) {
-        setEvents(tenantData.events || []);
+        const formattedEvents = ensureISODateFormat(tenantData.events || []);
+        setEvents(formattedEvents);
         setResources(tenantData.resources || []);
         if (!tenantName) {
           setTenantName(tenantData.name || tenantId);
