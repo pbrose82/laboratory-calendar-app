@@ -1,0 +1,134 @@
+.tenant-sidebar {
+  background-color: #f8f9fa;
+  border-right: 1px solid #e0e0e0;
+  height: 100%;
+  transition: width 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+}
+
+.tenant-sidebar.collapsed {
+  width: 50px;
+}
+
+.sidebar-header {
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.sidebar-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #0047BB;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tenant-sidebar.collapsed .sidebar-header h3 {
+  display: none;
+}
+
+.toggle-btn {
+  background: none;
+  border: none;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.toggle-btn:hover {
+  color: #0047BB;
+}
+
+.sidebar-content {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 10px 0;
+}
+
+.tenant-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tenant-list li {
+  margin-bottom: 2px;
+}
+
+.tenant-list li a {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  color: #495057;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.tenant-list li a:hover {
+  background-color: #e9ecef;
+}
+
+.tenant-list li.active a {
+  background-color: #0047BB;
+  color: white;
+}
+
+.tenant-list li i {
+  margin-right: 10px;
+  width: 16px;
+  text-align: center;
+}
+
+.tenant-sidebar.collapsed .tenant-name {
+  display: none;
+}
+
+.sidebar-loading, .sidebar-empty {
+  padding: 15px;
+  color: #6c757d;
+  text-align: center;
+}
+
+.sidebar-admin-link {
+  display: inline-block;
+  margin-top: 10px;
+  color: #0047BB;
+  text-decoration: none;
+}
+
+.sidebar-footer {
+  padding: 15px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.admin-link {
+  display: flex;
+  align-items: center;
+  color: #495057;
+  text-decoration: none;
+  padding: 10px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.admin-link:hover {
+  background-color: #e9ecef;
+}
+
+.admin-link i {
+  margin-right: 10px;
+  width: 16px;
+  text-align: center;
+}
+
+.tenant-sidebar.collapsed .admin-link span {
+  display: none;
+}
