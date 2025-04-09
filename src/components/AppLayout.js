@@ -60,35 +60,18 @@ function AppLayout({ children }) {
               )}
             </div>
 
-            {/* Search box */}
-            <button className={`c-btn-like-input c-btn-like-input__search o-flex--start u-margin-top-xxs u-padding-none u-line-height-0x ${isExpanded ? 'u-1/1 u-margin-right-l' : 'u-width-32 u-min-width-32'}`}
-                    title={isExpanded ? '' : 'Search'}
-                    onClick={() => {}} 
-                    data-qa="showQuickSearch">
-              <i className="fas fa-search c-btn-like-input__search__icon"></i>
+            {/* Search box - transparent background, no white */}
+            <div className={`search-transparent ${isExpanded ? 'search-wide' : 'search-narrow'}`}>
+              <i className="fas fa-search search-icon"></i>
               {isExpanded && (
                 <input 
                   placeholder="Search Laboratory Calendar"
                   readOnly
-                  className="t-5 u-truncated u-padding-right-xxs"/>
+                  className="search-input-transparent"/>
               )}
-            </button>
-
-            {/* New button */}
-            <div>
-              <button type="button"
-                      onClick={() => {}}
-                      data-qa="newProcessAndView"
-                      title={isExpanded ? '' : 'New'}
-                      className={`white-mat-button-base u-margin-top-m u-margin-bottom-l u-color-blue-gray-800 u-line-height-0x ${isExpanded ? 'u-margin-right-s' : 'u-width-32 u-min-width-32 u-padding-horizontal-ms'}`}>
-                <div className="o-flex u-height-100 o-flex--middle">
-                  <i className="fas fa-plus"></i>
-                  {isExpanded && (
-                    <div className="u-margin-left-xs">New</div>
-                  )}
-                </div>
-              </button>
             </div>
+
+            {/* Removed New button as requested */}
           </div>
 
           {/* Navigation Menu */}
@@ -112,8 +95,18 @@ function AppLayout({ children }) {
                 {isExpanded && <span className="t-4">My Assignments</span>}
               </Link>
               
-              {/* Only show current tenant in nav if accessing directly via URL */}
-              {tenantId && (
+              {/* Demo tenant always visible */}
+              <Link to="/demo-tenant" 
+                    className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-margin-bottom-m u-padding-top-xs u-1/1 u-padding-horizontal-l ${location.pathname === '/demo-tenant' ? 'c-selectable-item__dark--active' : ''}`}
+                    title={isExpanded ? null : 'Demo Tenant'}>
+                <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                  <i className="fas fa-flask u-color-white-opacity-72"></i>
+                </div>
+                {isExpanded && <span className="t-4">Demo Tenant</span>}
+              </Link>
+              
+              {/* Other tenant in nav if accessing directly via URL */}
+              {tenantId && tenantId !== 'demo-tenant' && (
                 <Link to={`/${tenantId}`}
                       className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-margin-bottom-m u-padding-top-xs u-1/1 u-padding-horizontal-l ${location.pathname === `/${tenantId}` ? 'c-selectable-item__dark--active' : ''}`}
                       title={isExpanded ? null : `${tenantId} Calendar`}>
@@ -124,38 +117,46 @@ function AppLayout({ children }) {
                 </Link>
               )}
             </div>
-            
-            {/* Admin section is only shown if the user is authenticated */}
-            {isAdminAuthenticated && isExpanded && (
-              <div className="admin-menu-section">
-                <h3 className="admin-section-title">Administration</h3>
-                <ul className="admin-menu-list">
-                  <li className={isAdminArea ? 'active' : ''}>
-                    <Link to="/admin">
-                      <i className="fas fa-cog"></i>
-                      <span>Manage Tenants</span>
-                    </Link>
-                  </li>
-                  <li>
-                    <button onClick={handleLogout} className="logout-button">
-                      <i className="fas fa-sign-out-alt"></i>
-                      <span>Logout</span>
-                    </button>
-                  </li>
-                </ul>
+
+            {/* Admin section at bottom */}
+            {isExpanded && (
+              <div className="admin-section-header">
+                <h3>ADMINISTRATION</h3>
               </div>
             )}
-            
-            {/* Login link if not authenticated */}
-            {!isAdminAuthenticated && (
-              <div className="admin-auth-link">
-                <Link to="/admin-login" 
-                      className={isAdminArea ? 'active' : ''}>
-                  <i className="fas fa-lock"></i>
-                  {isExpanded && <span>Admin Login</span>}
+
+            {/* Admin menu items */}
+            <div className="admin-section">
+              {isAdminAuthenticated ? (
+                <>
+                  <Link to="/admin"
+                        className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${isAdminArea ? 'c-selectable-item__dark--active' : ''}`}
+                        title={isExpanded ? null : 'Manage Tenants'}>
+                    <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                      <i className="fas fa-cog u-color-white-opacity-72"></i>
+                    </div>
+                    {isExpanded && <span className="t-4">Manage Tenants</span>}
+                  </Link>
+                  
+                  <button onClick={handleLogout}
+                          className="c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l c-admin-btn">
+                    <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                      <i className="fas fa-sign-out-alt u-color-white-opacity-72"></i>
+                    </div>
+                    {isExpanded && <span className="t-4">Logout</span>}
+                  </button>
+                </>
+              ) : (
+                <Link to="/admin-login"
+                      className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${isAdminArea ? 'c-selectable-item__dark--active' : ''}`}
+                      title={isExpanded ? null : 'Admin Login'}>
+                  <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                    <i className="fas fa-lock u-color-white-opacity-72"></i>
+                  </div>
+                  {isExpanded && <span className="t-4">Admin Login</span>}
                 </Link>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
