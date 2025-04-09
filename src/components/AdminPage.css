@@ -1,0 +1,242 @@
+.admin-page {
+  padding: 20px;
+  text-align: left;
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.admin-header h2 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.admin-section {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin-bottom: 30px;
+}
+
+.admin-section h3 {
+  margin-top: 0;
+  color: #2c3e50;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: #34495e;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.form-group input:focus {
+  border-color: #3498db;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.helper-text {
+  display: block;
+  margin-top: 5px;
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.submit-btn {
+  background-color: #2c3e50;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.2s;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background-color: #34495e;
+}
+
+.submit-btn:disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.tenant-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.tenant-table th,
+.tenant-table td {
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
+.tenant-table th {
+  background-color: #f4f4f4;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.tenant-table tr:hover {
+  background-color: #f9f9f9;
+}
+
+.action-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  margin-right: 5px;
+  transition: background-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.view-btn {
+  background-color: #3498db;
+  color: white;
+}
+
+.view-btn:hover {
+  background-color: #2980b9;
+}
+
+.delete-btn {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.delete-btn:hover {
+  background-color: #c0392b;
+}
+
+.status-message {
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  font-weight: bold;
+}
+
+.status-message.error {
+  color: #721c24;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+}
+
+.status-message.success {
+  color: #155724;
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+}
+
+.loading {
+  text-align: center;
+  padding: 20px;
+  color: #7f8c8d;
+}
+
+.error-message {
+  color: #e74c3c;
+  background-color: #fadbd8;
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+
+.no-tenants {
+  color: #7f8c8d;
+  text-align: center;
+  padding: 20px;
+}
+
+.url-container {
+  display: flex;
+  align-items: center;
+}
+
+.tenant-url {
+  flex-grow: 1;
+  margin-right: 8px;
+  color: #3498db;
+}
+
+.copy-btn {
+  background: none;
+  border: none;
+  color: #7f8c8d;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 16px;
+  transition: color 0.2s;
+}
+
+.copy-btn:hover {
+  color: #2c3e50;
+}
+
+.api-docs {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.code-block {
+  background-color: #2c3e50;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 4px;
+  margin: 10px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.code-block .copy-btn {
+  color: #95a5a6;
+}
+
+.code-block .copy-btn:hover {
+  color: white;
+}
+
+.json-example {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 4px;
+  overflow-x: auto;
+  border: 1px solid #ddd;
+  margin: 10px 0;
+  white-space: pre-wrap;
+  font-family: monospace;
+}
