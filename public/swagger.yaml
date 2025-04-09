@@ -1,6 +1,11 @@
 # Update the CalendarEvent definition in your public/swagger.yaml file
 # Replace the existing CalendarEvent schema with this one:
-
+swagger: "2.0"
+info:
+  title: Laboratory Calendar API
+  description: API documentation for the Laboratory Calendar application
+  version: "1.0.0"
+  
 CalendarEvent:
   type: object
   properties:
