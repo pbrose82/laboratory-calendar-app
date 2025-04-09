@@ -114,7 +114,7 @@ function TenantCalendar() {
     if (tenantId) {
       loadTenantData();
     }
-}, [tenantId, tenantName]);
+  }, [tenantId, tenantName]);
 
   const handleDateSelect = async (selectInfo) => {
     const title = prompt('Please enter a new event title:');
@@ -201,7 +201,28 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
     checkAndAddProp('notes', 'Notes');
     checkAndAddProp('recordId', 'Record ID');
     
-    // Show the alert with all details
+    // Check if there's an event link and handle it
+    const eventLink = event.extendedProps?.eventLink || event.eventLink;
+    if (eventLink) {
+      // Extract link from the eventLink text if it contains a URL
+      const linkMatch = eventLink.match(/(https:\/\/[^\s]+)/);
+      if (linkMatch && linkMatch[0]) {
+        const url = linkMatch[0];
+        // Add the link info to the details message
+        detailsMessage += `\n\nAlchemy Record: ${url}`;
+        
+        // Ask if the user wants to open the link
+        if (window.confirm(`${detailsMessage}\n\nDo you want to open the Alchemy record?`)) {
+          window.open(url, '_blank');
+          return; // Return early since we already showed the confirm dialog
+        }
+      } else {
+        // If no URL could be extracted, just display the eventLink text
+        detailsMessage += `\n\nEvent Link: ${eventLink}`;
+      }
+    }
+    
+    // Show the alert with all details (only if we didn't already show a confirm dialog)
     alert(detailsMessage);
   };
   
@@ -405,7 +426,7 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
               // List of properties that might be at top level or in extendedProps
               const propsToCheck = [
                 'location', 'equipment', 'technician', 'notes', 
-                'recordId', 'sampleType', 'reminders'
+                'recordId', 'sampleType', 'reminders', 'eventLink'
               ];
               
               // Ensure all properties are accessible in both places
