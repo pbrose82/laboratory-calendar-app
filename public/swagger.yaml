@@ -13,6 +13,8 @@ tags:
     description: Operations for managing tenants
   - name: Calendar Events
     description: Operations for managing calendar events
+  - name: Records
+    description: Operations for finding and managing records
 paths:
   /tenants:
     get:
@@ -145,66 +147,251 @@ paths:
           description: Server error
           schema:
             $ref: "#/definitions/Error"
+          
+  # Calendar Events - Separate endpoints for create, update, delete
   /calendar-events:
+    get:
+      summary: List calendar events
+      description: Returns a list of calendar events for a tenant
+      operationId: listCalendarEvents
+      tags:
+        - Calendar Events
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          type: string
+          description: ID of the tenant
+        - name: startDate
+          in: query
+          required: false
+          type: string
+          format: date
+          description: Start date for filtering events (YYYY-MM-DD)
+        - name: endDate
+          in: query
+          required: false
+          type: string
+          format: date
+          description: End date for filtering events (YYYY-MM-DD)
+        - name: resourceId
+          in: query
+          required: false
+          type: string
+          description: Filter events by resource ID
+      responses:
+        200:
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              data:
+                type: array
+                items:
+                  $ref: "#/definitions/CalendarEvent"
+        400:
+          description: Bad request
+          schema:
+            $ref: "#/definitions/Error"
+        404:
+          description: Tenant not found
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Server error
+          schema:
+            $ref: "#/definitions/Error"
     post:
-      summary: Manage calendar events
-      description: Create, update, or delete calendar events for a tenant
-      operationId: manageCalendarEvents
+      summary: Create calendar event
+      description: Creates a new calendar event for a tenant
+      operationId: createCalendarEvent
       tags:
         - Calendar Events
       parameters:
         - in: body
           name: body
-          description: Event operation details
+          description: New event details
           required: true
           schema:
             type: object
             required:
               - tenantId
-              - eventData
-              - action
+              - title
+              - start
+              - end
             properties:
               tenantId:
                 type: string
-                description: ID of the tenant that owns the event
-                example: lab-tenant-123
-              eventData:
-                type: object
-                description: Event data
-                properties:
-                  id:
-                    type: string
-                    description: Unique identifier for the event (required for update/delete)
-                  title:
-                    type: string
-                    description: Event title
-                  start:
-                    type: string
-                    format: date-time
-                    description: Event start time (ISO format)
-                  end:
-                    type: string
-                    format: date-time
-                    description: Event end time (ISO format)
-                  allDay:
-                    type: boolean
-                    description: Whether this is an all-day event
-                  resourceId:
-                    type: string
-                    description: ID of the associated resource (equipment)
-                  extendedProps:
-                    type: object
-                    description: Additional properties for the event
-              action:
+                description: ID of the tenant
+              title:
                 type: string
-                description: Action to perform
-                enum:
-                  - create
-                  - update
-                  - delete
+                description: Event title
+              start:
+                type: string
+                format: date-time
+                description: Event start time (ISO format)
+              end:
+                type: string
+                format: date-time
+                description: Event end time (ISO format)
+              allDay:
+                type: boolean
+                description: Whether this is an all-day event
+              resourceId:
+                type: string
+                description: ID of the associated resource (equipment)
+              extendedProps:
+                type: object
+                description: Additional properties for the event
+      responses:
+        201:
+          description: Event created successfully
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              data:
+                $ref: "#/definitions/CalendarEvent"
+        400:
+          description: Bad request - Missing required fields
+          schema:
+            $ref: "#/definitions/Error"
+        404:
+          description: Tenant not found
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Server error
+          schema:
+            $ref: "#/definitions/Error"
+            
+  /calendar-events/{eventId}:
+    get:
+      summary: Get calendar event
+      description: Returns details of a specific calendar event
+      operationId: getCalendarEvent
+      tags:
+        - Calendar Events
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          type: string
+          description: ID of the event to retrieve
+        - name: tenantId
+          in: query
+          required: true
+          type: string
+          description: ID of the tenant
       responses:
         200:
-          description: Operation completed successfully
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              data:
+                $ref: "#/definitions/CalendarEvent"
+        404:
+          description: Event not found
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Server error
+          schema:
+            $ref: "#/definitions/Error"
+            
+    put:
+      summary: Update calendar event
+      description: Updates an existing calendar event
+      operationId: updateCalendarEvent
+      tags:
+        - Calendar Events
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          type: string
+          description: ID of the event to update
+        - in: body
+          name: body
+          description: Updated event details
+          required: true
+          schema:
+            type: object
+            required:
+              - tenantId
+            properties:
+              tenantId:
+                type: string
+                description: ID of the tenant
+              title:
+                type: string
+                description: Event title
+              start:
+                type: string
+                format: date-time
+                description: Event start time (ISO format)
+              end:
+                type: string
+                format: date-time
+                description: Event end time (ISO format)
+              allDay:
+                type: boolean
+                description: Whether this is an all-day event
+              resourceId:
+                type: string
+                description: ID of the associated resource (equipment)
+              extendedProps:
+                type: object
+                description: Additional properties for the event
+      responses:
+        200:
+          description: Event updated successfully
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              data:
+                $ref: "#/definitions/CalendarEvent"
+        400:
+          description: Bad request
+          schema:
+            $ref: "#/definitions/Error"
+        404:
+          description: Event not found
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Server error
+          schema:
+            $ref: "#/definitions/Error"
+    
+    delete:
+      summary: Delete calendar event
+      description: Deletes a calendar event
+      operationId: deleteCalendarEvent
+      tags:
+        - Calendar Events
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          type: string
+          description: ID of the event to delete
+        - name: tenantId
+          in: query
+          required: true
+          type: string
+          description: ID of the tenant
+      responses:
+        200:
+          description: Event deleted successfully
           schema:
             type: object
             properties:
@@ -212,19 +399,215 @@ paths:
                 type: boolean
               data:
                 type: object
-                description: Response data varies based on action
-        400:
-          description: Bad request - Missing required fields
-          schema:
-            $ref: "#/definitions/Error"
+                properties:
+                  id:
+                    type: string
+                    description: ID of the deleted event
+                  deleted:
+                    type: boolean
+                    default: true
         404:
-          description: Tenant or event not found
+          description: Event not found
           schema:
             $ref: "#/definitions/Error"
         500:
           description: Server error
           schema:
             $ref: "#/definitions/Error"
+            
+  # Record management endpoints
+  /records:
+    get:
+      summary: Search records
+      description: Search for records with optional filtering
+      operationId: searchRecords
+      tags:
+        - Records
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          type: string
+          description: ID of the tenant
+        - name: query
+          in: query
+          required: false
+          type: string
+          description: Search query (searches across all fields)
+        - name: equipmentId
+          in: query
+          required: false
+          type: string
+          description: Filter by equipment ID
+        - name: startDate
+          in: query
+          required: false
+          type: string
+          format: date
+          description: Filter records by start date (YYYY-MM-DD)
+        - name: endDate
+          in: query
+          required: false
+          type: string
+          format: date
+          description: Filter records by end date (YYYY-MM-DD)
+        - name: page
+          in: query
+          required: false
+          type: integer
+          description: Page number for pagination
+          default: 1
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          description: Number of records per page
+          default: 10
+      responses:
+        200:
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              data:
+                type: object
+                properties:
+                  records:
+                    type: array
+                    items:
+                      $ref: "#/definitions/Record"
+                  total:
+                    type: integer
+                    description: Total number of records matching the query
+                  page:
+                    type: integer
+                    description: Current page number
+                  limit:
+                    type: integer
+                    description: Number of records per page
+        400:
+          description: Bad request
+          schema:
+            $ref: "#/definitions/Error"
+        404:
+          description: Tenant not found
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Server error
+          schema:
+            $ref: "#/definitions/Error"
+            
+  /records/{recordId}:
+    get:
+      summary: Get record details
+      description: Returns detailed information about a specific record
+      operationId: getRecord
+      tags:
+        - Records
+      parameters:
+        - name: recordId
+          in: path
+          required: true
+          type: string
+          description: ID of the record to fetch
+        - name: tenantId
+          in: query
+          required: true
+          type: string
+          description: ID of the tenant
+      responses:
+        200:
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              data:
+                $ref: "#/definitions/Record"
+        404:
+          description: Record not found
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Server error
+          schema:
+            $ref: "#/definitions/Error"
+            
+  /equipment:
+    get:
+      summary: List available equipment
+      description: Returns a list of equipment available in a tenant
+      operationId: listEquipment
+      tags:
+        - Records
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          type: string
+          description: ID of the tenant
+      responses:
+        200:
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              data:
+                type: array
+                items:
+                  $ref: "#/definitions/Resource"
+        404:
+          description: Tenant not found
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Server error
+          schema:
+            $ref: "#/definitions/Error"
+            
+  /equipment/{equipmentId}:
+    get:
+      summary: Get equipment details
+      description: Returns detailed information about specific equipment
+      operationId: getEquipment
+      tags:
+        - Records
+      parameters:
+        - name: equipmentId
+          in: path
+          required: true
+          type: string
+          description: ID of the equipment to fetch
+        - name: tenantId
+          in: query
+          required: true
+          type: string
+          description: ID of the tenant
+      responses:
+        200:
+          description: Successful operation
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+              data:
+                $ref: "#/definitions/Resource"
+        404:
+          description: Equipment not found
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Server error
+          schema:
+            $ref: "#/definitions/Error"
+            
 definitions:
   Tenant:
     type: object
@@ -249,6 +632,7 @@ definitions:
         description: List of resources (equipment)
         items:
           $ref: "#/definitions/Resource"
+          
   CalendarEvent:
     type: object
     properties:
@@ -285,6 +669,19 @@ definitions:
           sampleType:
             type: string
             description: Type of sample being processed
+          recordId:
+            type: string
+            description: Associated record ID
+          recordLink:
+            type: string
+            description: Link to the associated record
+          location:
+            type: string
+            description: Location name
+          reservationDetails:
+            type: string
+            description: Additional reservation details
+            
   Resource:
     type: object
     properties:
@@ -294,6 +691,64 @@ definitions:
       title:
         type: string
         description: Display name for the resource
+      type:
+        type: string
+        description: Type of resource (e.g., 'equipment')
+      availability:
+        type: string
+        enum: [available, in-use, maintenance, reserved]
+        description: Current availability status
+      location:
+        type: string
+        description: Physical location of the equipment
+      details:
+        type: object
+        description: Additional equipment details
+        
+  Record:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Unique identifier for the record
+      title:
+        type: string
+        description: Record title
+      createdAt:
+        type: string
+        format: date-time
+        description: When the record was created
+      updatedAt:
+        type: string
+        format: date-time
+        description: When the record was last updated
+      status:
+        type: string
+        description: Current status of the record
+      equipmentId:
+        type: string
+        description: ID of the associated equipment
+      equipmentName:
+        type: string
+        description: Name of the associated equipment
+      reservationStartTime:
+        type: string
+        format: date-time
+        description: Start time of the equipment reservation
+      reservationEndTime:
+        type: string
+        format: date-time
+        description: End time of the equipment reservation
+      location:
+        type: string
+        description: Location name
+      technician:
+        type: string
+        description: Name of the technician
+      details:
+        type: object
+        description: Additional record details
+        
   Error:
     type: object
     properties:
