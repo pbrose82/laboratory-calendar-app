@@ -94,85 +94,102 @@ app.post('/api/calendar-events', (req, res) => {
     
     const body = req.body;
     
-    // Find this section in your server.js file (around line 120-160):
-
-// Check if we have the hybrid format (title, action, tenantId directly at root)
-if (body.title && body.action === 'create' && body.tenantId && body.start && body.end) {
-  console.log('Detected hybrid format from Alchemy');
-  const tenantId = body.tenantId;
-  
-  // Transform to our standard format
-  const eventData = {
-    title: body.title,
-    start: body.start,
-    end: body.end,
-    allDay: false,
-    extendedProps: {
-      location: body.location,
-      reminders: body.reminders
-    }
-  };
-  
-  // ADDED DATE CONVERSION - Convert dates to ISO format for FullCalendar compatibility
-  try {
-    // Parse the date strings from Alchemy format to ISO format
-    const startDate = new Date(body.start);
-    const endDate = new Date(body.end);
-    
-    // Make sure the dates are valid before using them
-    if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-      eventData.start = startDate.toISOString();
-      eventData.end = endDate.toISOString();
+    // Check if we have the hybrid format (title, action, tenantId directly at root)
+    if (body.title && body.action === 'create' && body.tenantId && body.start && body.end) {
+      console.log('Detected hybrid format from Alchemy');
+      const tenantId = body.tenantId;
       
-      // Log the date conversion for debugging
-      console.log('Converted dates to ISO format:');
-      console.log('Original start:', body.start, 'ISO start:', eventData.start);
-      console.log('Original end:', body.end, 'ISO end:', eventData.end);
-    } else {
-      console.warn('Could not parse dates from Alchemy format, using as-is');
-    }
-  } catch (dateError) {
-    console.error('Error converting dates to ISO format:', dateError);
-    // Continue with original format if conversion fails
-  }
-  
-  // Create tenant if needed
-  if (!tenants[tenantId]) {
-    console.log(`Creating new tenant: ${tenantId}`);
-    tenants[tenantId] = {
-      id: tenantId,
-      name: tenantId,
-      createdAt: new Date().toISOString(),
-      events: [],
-      resources: [
-        { id: 'equipment-1', title: 'HPLC Machine' },
-        { id: 'equipment-2', title: 'Mass Spectrometer' },
-        { id: 'equipment-3', title: 'PCR Machine' }
-      ]
-    };
-  }
-  
-  // Initialize events array if it doesn't exist
-  if (!tenants[tenantId].events) {
-    tenants[tenantId].events = [];
-  }
-  
-  // Generate ID if none exists
-  eventData.id = Date.now().toString();
-  
-  // Add to events
-  tenants[tenantId].events.push(eventData);
-  
-  // Save tenant data after modification
-  const saveSuccess = saveTenantData();
-  
-  console.log(`Processed hybrid format event for tenant ${tenantId}, save success: ${saveSuccess}`);
-  return res.json({ 
-    success: true, 
-    data: eventData,
-    message: "Event created from hybrid format"
-  });
-}
+      // Transform to our standard format with all properties at top level
+      const eventData = {
+        id: Date.now().toString(),
+        title: body.title,
+        start: body.start,
+        end: body.end,
+        allDay: body.allDay || false,
+        location: body.location,
+        equipment: body.equipment,
+        technician: body.technician,
+        notes: body.notes,
+        recordId: body.recordId,
+        sampleType: body.sampleType,
+        reminders: body.reminders
+        // Add any other fields you want to support here
+      };
+      
+      // Convert dates to ISO format for FullCalendar compatibility
+      try {
+        // Parse the date strings from Alchemy format to ISO format
+        const startDate = new Date(body.start);
+        const endDate = new Date(body.end);
+        
+        // Make sure the dates are valid before using them
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          eventData.start = startDate.toISOString();
+          eventData.end = endDate.toISOString();
+          
+          // Log the date conversion for debugging
+          console.log('Converted dates to ISO format:');
+          console.log('Original start:', body.start, 'ISO start:', eventData.start);
+          console.log('Original end:', body.end, 'ISO end:', eventData.end);
+        } else {
+          console.warn('Could not parse dates from Alchemy format, using as-is');
+        }
+      } catch (dateError) {
+        console.error('Error converting dates to ISO format:', dateError);
+        // Continue with original format if conversion fails
+      }
+      
+      // If equipment is specified, try to match it with a resource
+      if (body.equipment) {
+        // Find the matching resource based on equipment name
+        const resources = tenants[tenantId]?.resources || [];
+        const matchingResource = resources.find(r => r.title === body.equipment);
+        
+        if (matchingResource) {
+          eventData.resourceId = matchingResource.id;
+          console.log(`Matched equipment "${body.equipment}" to resource ID "${matchingResource.id}"`);
+        } else {
+          console.log(`No matching resource found for equipment "${body.equipment}"`);
+        }
+      }
+      
+      // Log the complete event data
+      console.log('Complete event data:', JSON.stringify(eventData, null, 2));
+      
+      // Create tenant if needed
+      if (!tenants[tenantId]) {
+        console.log(`Creating new tenant: ${tenantId}`);
+        tenants[tenantId] = {
+          id: tenantId,
+          name: tenantId,
+          createdAt: new Date().toISOString(),
+          events: [],
+          resources: [
+            { id: 'equipment-1', title: 'HPLC Machine' },
+            { id: 'equipment-2', title: 'Mass Spectrometer' },
+            { id: 'equipment-3', title: 'PCR Machine' }
+          ]
+        };
+      }
+      
+      // Initialize events array if it doesn't exist
+      if (!tenants[tenantId].events) {
+        tenants[tenantId].events = [];
+      }
+      
+      // Add to events
+      tenants[tenantId].events.push(eventData);
+      
+      // Save tenant data after modification
+      const saveSuccess = saveTenantData();
+      
+      console.log(`Processed hybrid format event for tenant ${tenantId}, save success: ${saveSuccess}`);
+      return res.json({ 
+        success: true, 
+        data: eventData,
+        message: "Event created from hybrid format"
+      });
+    } 
     // Check if this is the legacy Google Calendar format (has calendarId, summary)
     else if (body.calendarId && body.summary) {
       console.log('Received legacy Google Calendar format request');
@@ -185,15 +202,29 @@ if (body.title && body.action === 'create' && body.tenantId && body.start && bod
         title: body.summary,
         start: body.StartUse,  // Use the original field names
         end: body.EndUse,
-        allDay: false,
+        allDay: body.allDay || false,
         resourceId: body.resourceId || 'equipment-1',
-        extendedProps: {
-          location: body.location,
-          description: body.description,
-          timeZone: body.timeZone,
-          reminders: body.reminders
-        }
+        location: body.location,
+        equipment: body.equipment,
+        technician: body.technician,
+        notes: body.description,
+        recordId: body.recordId,
+        sampleType: body.sampleType,
+        reminders: body.reminders
       };
+      
+      // Convert dates to ISO format for FullCalendar compatibility
+      try {
+        const startDate = new Date(body.StartUse);
+        const endDate = new Date(body.EndUse);
+        
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          eventData.start = startDate.toISOString();
+          eventData.end = endDate.toISOString();
+        }
+      } catch (dateError) {
+        console.error('Error converting legacy dates to ISO format:', dateError);
+      }
       
       // Check if tenant exists, create if it doesn't
       if (!tenants[tenantId]) {
@@ -280,6 +311,25 @@ if (body.title && body.action === 'create' && body.tenantId && body.start && bod
             eventData.id = Date.now().toString();
           }
           
+          // Convert dates to ISO format
+          try {
+            if (eventData.start && typeof eventData.start === 'string') {
+              const startDate = new Date(eventData.start);
+              if (!isNaN(startDate.getTime())) {
+                eventData.start = startDate.toISOString();
+              }
+            }
+            
+            if (eventData.end && typeof eventData.end === 'string') {
+              const endDate = new Date(eventData.end);
+              if (!isNaN(endDate.getTime())) {
+                eventData.end = endDate.toISOString();
+              }
+            }
+          } catch (dateError) {
+            console.error('Error converting dates in standard format:', dateError);
+          }
+          
           tenants[tenantId].events.push(eventData);
           result = eventData;
           break;
@@ -293,6 +343,25 @@ if (body.title && body.action === 'create' && body.tenantId && body.start && bod
           
           if (eventIndex === -1) {
             return res.status(404).json({ error: `Event "${eventData.id}" not found for tenant "${tenantId}"` });
+          }
+          
+          // Convert dates to ISO format if provided
+          try {
+            if (eventData.start && typeof eventData.start === 'string') {
+              const startDate = new Date(eventData.start);
+              if (!isNaN(startDate.getTime())) {
+                eventData.start = startDate.toISOString();
+              }
+            }
+            
+            if (eventData.end && typeof eventData.end === 'string') {
+              const endDate = new Date(eventData.end);
+              if (!isNaN(endDate.getTime())) {
+                eventData.end = endDate.toISOString();
+              }
+            }
+          } catch (dateError) {
+            console.error('Error converting dates in update:', dateError);
           }
           
           tenants[tenantId].events[eventIndex] = {
@@ -553,6 +622,25 @@ app.put('/api/calendar-events/:eventId', (req, res) => {
     
     if (eventIndex === -1) {
       return res.status(404).json({ error: `Event "${eventId}" not found for tenant "${tenantId}"` });
+    }
+    
+    // Convert dates to ISO format if provided
+    try {
+      if (updateData.start && typeof updateData.start === 'string') {
+        const startDate = new Date(updateData.start);
+        if (!isNaN(startDate.getTime())) {
+          updateData.start = startDate.toISOString();
+        }
+      }
+      
+      if (updateData.end && typeof updateData.end === 'string') {
+        const endDate = new Date(updateData.end);
+        if (!isNaN(endDate.getTime())) {
+          updateData.end = endDate.toISOString();
+        }
+      }
+    } catch (dateError) {
+      console.error('Error converting dates in PUT update:', dateError);
     }
     
     tenants[tenantId].events[eventIndex] = {
