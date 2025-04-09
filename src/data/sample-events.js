@@ -1,8 +1,8 @@
 export const laboratoryEvents = [
   {
     title: 'HPLC Analysis',
-    start: '2024-04-15T09:00:00',
-    end: '2024-04-15T11:00:00',
+    start: '2025-04-09T10:00:00',
+    end: '2025-04-09T12:00:00',
     resourceId: 'equipment-1',
     extendedProps: {
       equipment: 'HPLC Machine',
@@ -12,8 +12,8 @@ export const laboratoryEvents = [
   },
   {
     title: 'Mass Spectrometry',
-    start: '2024-04-16T13:30:00',
-    end: '2024-04-16T16:00:00',
+    start: '2025-04-10T13:30:00',
+    end: '2025-04-10T16:00:00',
     resourceId: 'equipment-2',
     extendedProps: {
       equipment: 'Mass Spectrometer',
@@ -23,8 +23,8 @@ export const laboratoryEvents = [
   },
   {
     title: 'PCR Testing',
-    start: '2024-04-17T10:00:00',
-    end: '2024-04-17T12:30:00',
+    start: '2025-04-11T10:00:00',
+    end: '2025-04-11T12:30:00',
     resourceId: 'equipment-3',
     extendedProps: {
       equipment: 'PCR Machine',
@@ -38,4 +38,76 @@ export const laboratoryResources = [
   { id: 'equipment-1', title: 'HPLC Machine' },
   { id: 'equipment-2', title: 'Mass Spectrometer' },
   { id: 'equipment-3', title: 'PCR Machine' }
+];
+
+// Demo tenant data
+export const demoTenantEvents = [
+  {
+    id: 'demo-event-1',
+    title: 'Sample Analysis',
+    start: '2025-04-09T09:00:00',
+    end: '2025-04-09T11:30:00',
+    resourceId: 'demo-equip-1',
+    extendedProps: {
+      equipment: 'Microscope A',
+      technician: 'Dr. Maria Chen',
+      sampleType: 'Tissue Sample'
+    }
+  },
+  {
+    id: 'demo-event-2',
+    title: 'Centrifuge Run',
+    start: '2025-04-10T14:00:00',
+    end: '2025-04-10T15:30:00',
+    resourceId: 'demo-equip-2',
+    extendedProps: {
+      equipment: 'Ultra Centrifuge B',
+      technician: 'Dr. Robert Kim',
+      sampleType: 'Blood Separation'
+    }
+  },
+  {
+    id: 'demo-event-3',
+    title: 'Calibration Check',
+    start: '2025-04-11T08:30:00',
+    end: '2025-04-11T10:00:00',
+    resourceId: 'demo-equip-3',
+    extendedProps: {
+      equipment: 'pH Meter C',
+      technician: 'Lab Tech Sarah',
+      sampleType: 'Maintenance'
+    }
+  },
+  {
+    id: 'demo-event-4',
+    title: 'DNA Sequencing',
+    start: '2025-04-09T13:00:00',
+    end: '2025-04-09T17:00:00',
+    resourceId: 'demo-equip-4',
+    extendedProps: {
+      equipment: 'DNA Sequencer',
+      technician: 'Dr. James Wilson',
+      sampleType: 'Genomic Research'
+    }
+  },
+  {
+    id: 'demo-event-5',
+    title: 'Spectroscopy',
+    start: '2025-04-10T09:00:00',
+    end: '2025-04-10T12:00:00',
+    resourceId: 'demo-equip-5',
+    extendedProps: {
+      equipment: 'IR Spectrometer',
+      technician: 'Dr. Emily Taylor',
+      sampleType: 'Compound Analysis'
+    }
+  }
+];
+
+export const demoTenantResources = [
+  { id: 'demo-equip-1', title: 'Microscope A' },
+  { id: 'demo-equip-2', title: 'Ultra Centrifuge B' },
+  { id: 'demo-equip-3', title: 'pH Meter C' },
+  { id: 'demo-equip-4', title: 'DNA Sequencer' },
+  { id: 'demo-equip-5', title: 'IR Spectrometer' }
 ];
