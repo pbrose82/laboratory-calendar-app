@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import TenantSidebar from './TenantSidebar';
 import './AppLayout.css';
 
 function AppLayout({ children }) {
