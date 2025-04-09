@@ -55,7 +55,9 @@ function TenantCalendar() {
         
         if (tenantData) {
           console.log('Loaded tenant data:', tenantData);
-          setEvents(tenantData.events || []);
+          const formattedEvents = ensureISODateFormat(tenantData.events || []);
+          console.log('Events after date format validation:', formattedEvents);
+          setEvents(formattedEvents);
           setResources(tenantData.resources || []);
           if (!tenantName) {
             setTenantName(tenantData.name || tenantId);
