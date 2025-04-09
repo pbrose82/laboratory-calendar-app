@@ -1,0 +1,230 @@
+/* TenantCalendar.css - Complete styles for the tenant calendar view */
+
+/* Calendar container */
+.dashboard-container {
+  padding: 0;
+  width: 100%;
+}
+
+/* Content header */
+.content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.content-header h1 {
+  font-size: 1.8rem;
+  font-weight: 500;
+  margin: 0;
+  color: #1565C0; /* Updated blue color */
+}
+
+/* Header actions container */
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Button styling */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.btn-primary {
+  color: #fff;
+  background-color: #1565C0; /* Updated blue color */
+  border-color: #1565C0;
+}
+
+.btn-primary:hover {
+  background-color: #0D47A1; /* Darker shade for hover state */
+  border-color: #0D47A1;
+}
+
+.btn-outline-primary {
+  color: #1565C0; /* Updated blue color */
+  background-color: transparent;
+  border-color: #1565C0;
+}
+
+.btn-outline-primary:hover {
+  color: #fff;
+  background-color: #1565C0;
+  border-color: #1565C0;
+}
+
+.btn-outline-secondary {
+  color: #6c757d;
+  background-color: transparent;
+  border-color: #6c757d;
+}
+
+.btn-outline-secondary:hover {
+  color: #fff;
+  background-color: #6c757d;
+  border-color: #6c757d;
+}
+
+.me-1 {
+  margin-right: 0.25rem;
+}
+
+.me-2 {
+  margin-right: 0.5rem;
+}
+
+.mt-3 {
+  margin-top: 1rem;
+}
+
+/* Laboratory Calendar */
+.laboratory-calendar {
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+/* FullCalendar Overrides */
+.laboratory-calendar .fc-toolbar-title {
+  font-size: 1.5rem;
+  color: #1565C0;
+}
+
+.laboratory-calendar .fc-button-primary {
+  background-color: #1565C0;
+  border-color: #1565C0;
+}
+
+.laboratory-calendar .fc-button-primary:hover {
+  background-color: #0D47A1;
+  border-color: #0D47A1;
+}
+
+.laboratory-calendar .fc-button-active {
+  background-color: #0D47A1 !important;
+  border-color: #0D47A1 !important;
+}
+
+.laboratory-calendar .fc-event {
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.laboratory-calendar .fc-col-header-cell-cushion {
+  padding: 8px 4px;
+}
+
+.laboratory-calendar .fc-daygrid-day-number {
+  padding: 6px;
+}
+
+.laboratory-calendar .fc-timegrid-slot-label {
+  font-size: 0.8rem;
+}
+
+.laboratory-calendar .fc-scroller {
+  overflow-y: auto !important;
+  height: auto !important;
+}
+
+/* Loading Container */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  color: #6c757d;
+}
+
+/* Error Handling */
+.error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 15px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 4px solid #dc3545;
+}
+
+.error-message h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+}
+
+/* Weekend toggle selected color */
+.btn.weekend-toggle.selected {
+  background-color: #1565C0;
+  color: white;
+}
+
+/* Responsive design */
+@media (max-width: 992px) {
+  .content-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .header-actions {
+    margin-top: 10px;
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-actions {
+    flex-wrap: wrap;
+  }
+  
+  .btn-sm {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.8rem;
+  }
+  
+  .laboratory-calendar {
+    padding: 10px;
+  }
+  
+  .laboratory-calendar .fc-toolbar {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .laboratory-calendar .fc-toolbar-title {
+    font-size: 1.2rem;
+  }
+}
+
+/* Today highlight */
+.laboratory-calendar .fc-day-today {
+  background-color: rgba(21, 101, 192, 0.05) !important;
+}
+
+/* Event hover effect */
+.laboratory-calendar .fc-event:hover {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
