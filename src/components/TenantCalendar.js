@@ -111,69 +111,72 @@ function TenantCalendar() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="laboratory-calendar loading-container">
-        <div>Loading tenant calendar...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="laboratory-calendar">
-        <div className="error-message">
-          <h3>Error</h3>
-          <p>{error}</p>
-          <button className="btn btn-primary mt-3" onClick={() => navigate('/')}>
-            Return to Main Calendar
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="laboratory-calendar">
-      <div className="tenant-header">
-        <h2 className="tenant-title">Calendar for {tenantName}</h2>
-        <div className="tenant-actions">
+    <div className="dashboard-container">
+      {/* Breadcrumbs */}
+      <div className="breadcrumb-container">
+        <ul className="breadcrumb">
+          <li className="breadcrumb-item"><a href="/">Home</a></li>
+          <li className="breadcrumb-item active">{tenantName}</li>
+        </ul>
+      </div>
+      
+      <div className="content-header">
+        <h1>{tenantName} Calendar</h1>
+        <div className="header-actions">
           <button 
             className="btn btn-sm btn-outline-secondary"
             onClick={() => navigate('/')}
           >
-            Back to Main Calendar
+            <i className="fas fa-arrow-left me-2"></i>Back
           </button>
           
-          {/* Admin link */}
           <button 
-            className="btn btn-sm btn-outline-primary ms-2"
+            className="btn btn-sm btn-outline-primary"
             onClick={() => navigate('/admin')}
           >
-            Admin
+            <i className="fas fa-cog me-2"></i>Admin
           </button>
         </div>
       </div>
       
-      <FullCalendar
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        initialView="timeGridWeek"
-        headerToolbar={{
-          left: 'prev,next today',
-          center: 'title',
-          right: 'dayGridMonth,timeGridWeek,timeGridDay'
-        }}
-        editable={true}
-        selectable={true}
-        selectMirror={true}
-        dayMaxEvents={true}
-        select={handleDateSelect}
-        eventClick={handleEventClick}
-        eventDrop={handleEventDrop}
-        events={events}
-        resources={resources}
-        height="auto"
-      />
+      {loading ? (
+        <div className="laboratory-calendar loading-container">
+          <div>Loading tenant calendar...</div>
+        </div>
+      ) : error ? (
+        <div className="laboratory-calendar">
+          <div className="error-message">
+            <h3>Error</h3>
+            <p>{error}</p>
+            <button className="btn btn-primary mt-3" onClick={() => navigate('/')}>
+              Return to Main Calendar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="laboratory-calendar">
+          <FullCalendar
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            initialView="timeGridWeek"
+            headerToolbar={{
+              left: 'prev,next today',
+              center: 'title',
+              right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            }}
+            editable={true}
+            selectable={true}
+            selectMirror={true}
+            dayMaxEvents={true}
+            select={handleDateSelect}
+            eventClick={handleEventClick}
+            eventDrop={handleEventDrop}
+            events={events}
+            resources={resources}
+            height="auto"
+          />
+        </div>
+      )}
     </div>
   );
 }
