@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchTenant } from '../services/apiClient';
 import './ResourceViews.css';
@@ -11,16 +11,20 @@ function EquipmentList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tenantName, setTenantName] = useState('');
-  const [autoRefresh, setAutoRefresh] = useState(true);
   
   // Filters
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
+  
+  // Ref to track if component is mounted
+  const isMounted = useRef(true);
 
-  // Function to load tenant data - extracted for reuse with auto-refresh
-  const loadTenantData = async () => {
+  // Function to load tenant data - handles both initial load and background refresh
+  const loadTenantData = async (isInitialLoad = false) => {
     try {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       
       // Special handling for tenant name
       if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
@@ -30,8 +34,7 @@ function EquipmentList() {
       // Normal tenant handling from API
       const tenantData = await fetchTenant(tenantId);
       
-      if (tenantData) {
-        console.log('Loaded tenant data:', tenantData);
+      if (tenantData && isMounted.current) {
         setResources(tenantData.resources || []);
         setEvents(tenantData.events || []);
         
@@ -39,42 +42,48 @@ function EquipmentList() {
           setTenantName(tenantData.name || tenantId);
         }
         
-        console.log('Equipment data refreshed at', new Date().toLocaleTimeString());
-      } else {
-        setError(`Tenant "${tenantId}" not found`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Equipment data refreshed at', new Date().toLocaleTimeString());
+        }
       }
     } catch (err) {
-      console.error('Failed to load tenant data:', err);
-      setError(`Error loading tenant data: ${err.message}`);
+      if (isMounted.current) {
+        console.error('Failed to load tenant data:', err);
+        setError(`Error loading tenant data: ${err.message}`);
+      }
     } finally {
-      setLoading(false);
+      if (isInitialLoad && isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
   // Initial data load
   useEffect(() => {
     if (tenantId) {
-      loadTenantData();
+      loadTenantData(true);
     }
+    
+    // Cleanup function
+    return () => {
+      isMounted.current = false;
+    };
   }, [tenantId, tenantName]);
   
-  // Auto-refresh setup
+  // Set up automatic background refresh
   useEffect(() => {
-    let refreshInterval;
-    
-    if (autoRefresh) {
-      // Refresh data every 30 seconds
-      refreshInterval = setInterval(() => {
-        console.log('Auto-refreshing equipment list data...');
-        loadTenantData();
-      }, 30000);
-    }
+    // Refresh data every 30 seconds
+    const refreshInterval = setInterval(() => {
+      if (isMounted.current) {
+        loadTenantData(false);
+      }
+    }, 30000);
     
     // Clean up interval on component unmount
     return () => {
-      if (refreshInterval) clearInterval(refreshInterval);
+      clearInterval(refreshInterval);
     };
-  }, [autoRefresh, tenantId]);
+  }, [tenantId]);
 
   // Get current equipment status
   const getResourceStatus = (resourceId) => {
@@ -180,31 +189,9 @@ function EquipmentList() {
     <div className="dashboard-container">
       <div className="content-header">
         <h1>{getDisplayName()} - Equipment List</h1>
-        <div className="header-actions">
-          {/* Auto-refresh toggle */}
+        <div className="header-actions">          
           <button 
-            className={`btn ${autoRefresh ? 'btn-primary' : 'btn-outline-primary'}`}
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
-          >
-            <i className={`fas fa-${autoRefresh ? 'sync-alt fa-spin' : 'sync-alt'} me-1`}></i>
-            {autoRefresh ? "Auto" : "Manual"}
-          </button>
-          
-          {/* Manual refresh button - only show when auto is off */}
-          {!autoRefresh && (
-            <button 
-              className="btn btn-outline-secondary ms-2"
-              onClick={loadTenantData}
-              title="Refresh data"
-            >
-              <i className="fas fa-redo-alt me-1"></i>
-              Refresh
-            </button>
-          )}
-          
-          <button 
-            className="btn btn-outline-secondary ms-2"
+            className="btn btn-outline-primary"
             onClick={() => navigate(`/${tenantId}`)}
           >
             <i className="fas fa-calendar-alt me-1"></i>
