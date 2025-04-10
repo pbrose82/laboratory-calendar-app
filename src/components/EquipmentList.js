@@ -11,47 +11,70 @@ function EquipmentList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tenantName, setTenantName] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(true);
   
   // Filters
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
 
-  useEffect(() => {
-    async function loadTenantData() {
-      try {
-        setLoading(true);
-        
-        // Special handling for tenant name
-        if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
-          setTenantName('Product CASE UAT');
-        }
-        
-        // Normal tenant handling from API
-        const tenantData = await fetchTenant(tenantId);
-        
-        if (tenantData) {
-          console.log('Loaded tenant data:', tenantData);
-          setResources(tenantData.resources || []);
-          setEvents(tenantData.events || []);
-          
-          if (!tenantName) {
-            setTenantName(tenantData.name || tenantId);
-          }
-        } else {
-          setError(`Tenant "${tenantId}" not found`);
-        }
-      } catch (err) {
-        console.error('Failed to load tenant data:', err);
-        setError(`Error loading tenant data: ${err.message}`);
-      } finally {
-        setLoading(false);
+  // Function to load tenant data - extracted for reuse with auto-refresh
+  const loadTenantData = async () => {
+    try {
+      setLoading(true);
+      
+      // Special handling for tenant name
+      if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
+        setTenantName('Product CASE UAT');
       }
+      
+      // Normal tenant handling from API
+      const tenantData = await fetchTenant(tenantId);
+      
+      if (tenantData) {
+        console.log('Loaded tenant data:', tenantData);
+        setResources(tenantData.resources || []);
+        setEvents(tenantData.events || []);
+        
+        if (!tenantName) {
+          setTenantName(tenantData.name || tenantId);
+        }
+        
+        console.log('Equipment data refreshed at', new Date().toLocaleTimeString());
+      } else {
+        setError(`Tenant "${tenantId}" not found`);
+      }
+    } catch (err) {
+      console.error('Failed to load tenant data:', err);
+      setError(`Error loading tenant data: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  // Initial data load
+  useEffect(() => {
     if (tenantId) {
       loadTenantData();
     }
   }, [tenantId, tenantName]);
+  
+  // Auto-refresh setup
+  useEffect(() => {
+    let refreshInterval;
+    
+    if (autoRefresh) {
+      // Refresh data every 30 seconds
+      refreshInterval = setInterval(() => {
+        console.log('Auto-refreshing equipment list data...');
+        loadTenantData();
+      }, 30000);
+    }
+    
+    // Clean up interval on component unmount
+    return () => {
+      if (refreshInterval) clearInterval(refreshInterval);
+    };
+  }, [autoRefresh, tenantId]);
 
   // Get current equipment status
   const getResourceStatus = (resourceId) => {
@@ -158,8 +181,30 @@ function EquipmentList() {
       <div className="content-header">
         <h1>{getDisplayName()} - Equipment List</h1>
         <div className="header-actions">
+          {/* Auto-refresh toggle */}
           <button 
-            className="btn btn-outline-secondary"
+            className={`btn ${autoRefresh ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
+          >
+            <i className={`fas fa-${autoRefresh ? 'sync-alt fa-spin' : 'sync-alt'} me-1`}></i>
+            {autoRefresh ? "Auto" : "Manual"}
+          </button>
+          
+          {/* Manual refresh button - only show when auto is off */}
+          {!autoRefresh && (
+            <button 
+              className="btn btn-outline-secondary ms-2"
+              onClick={loadTenantData}
+              title="Refresh data"
+            >
+              <i className="fas fa-redo-alt me-1"></i>
+              Refresh
+            </button>
+          )}
+          
+          <button 
+            className="btn btn-outline-secondary ms-2"
             onClick={() => navigate(`/${tenantId}`)}
           >
             <i className="fas fa-calendar-alt me-1"></i>
@@ -210,63 +255,70 @@ function EquipmentList() {
             </div>
           </div>
           
-          <table className="equipment-table">
-            <thead>
-              <tr>
-                <th>Equipment</th>
-                <th>Status</th>
-                <th>Total Reservations</th>
-                <th>Next Reservation</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {getFilteredResources().map(resource => {
-                const status = getResourceStatus(resource.id);
-                const nextReservation = getNextReservation(resource.id);
+          {resources.length === 0 ? (
+            <div className="text-center py-4 mt-4">
+              <i className="fas fa-microscope fa-3x mb-3 text-muted"></i>
+              <p>No equipment found. Equipment will appear here when added to calendar events.</p>
+            </div>
+          ) : (
+            <table className="equipment-table">
+              <thead>
+                <tr>
+                  <th>Equipment</th>
+                  <th>Status</th>
+                  <th>Total Reservations</th>
+                  <th>Next Reservation</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {getFilteredResources().map(resource => {
+                  const status = getResourceStatus(resource.id);
+                  const nextReservation = getNextReservation(resource.id);
+                  
+                  return (
+                    <tr key={resource.id}>
+                      <td>{resource.title}</td>
+                      <td>
+                        <span className={`badge ${status === 'available' ? 'badge-success' : 'badge-danger'}`}>
+                          {status === 'available' ? 'Available' : 'In Use'}
+                        </span>
+                      </td>
+                      <td>{countReservations(resource.id)}</td>
+                      <td>
+                        {nextReservation ? (
+                          <div>
+                            <div>{formatDate(nextReservation.start)}</div>
+                            <div className="small text-muted">{nextReservation.title}</div>
+                          </div>
+                        ) : (
+                          <span className="text-muted">No upcoming reservations</span>
+                        )}
+                      </td>
+                      <td>
+                        <button 
+                          className="btn btn-sm btn-primary"
+                          onClick={() => handleViewSchedule(resource.id)}
+                        >
+                          <i className="fas fa-calendar-alt me-1"></i>
+                          View Schedule
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
                 
-                return (
-                  <tr key={resource.id}>
-                    <td>{resource.title}</td>
-                    <td>
-                      <span className={`badge ${status === 'available' ? 'badge-success' : 'badge-danger'}`}>
-                        {status === 'available' ? 'Available' : 'In Use'}
-                      </span>
-                    </td>
-                    <td>{countReservations(resource.id)}</td>
-                    <td>
-                      {nextReservation ? (
-                        <div>
-                          <div>{formatDate(nextReservation.start)}</div>
-                          <div className="small text-muted">{nextReservation.title}</div>
-                        </div>
-                      ) : (
-                        <span className="text-muted">No upcoming reservations</span>
-                      )}
-                    </td>
-                    <td>
-                      <button 
-                        className="btn btn-sm btn-primary"
-                        onClick={() => handleViewSchedule(resource.id)}
-                      >
-                        <i className="fas fa-calendar-alt me-1"></i>
-                        View Schedule
-                      </button>
+                {getFilteredResources().length === 0 && (
+                  <tr>
+                    <td colSpan="5" className="text-center py-4">
+                      <i className="fas fa-info-circle me-2"></i>
+                      No equipment found matching the selected filters
                     </td>
                   </tr>
-                );
-              })}
-              
-              {getFilteredResources().length === 0 && (
-                <tr>
-                  <td colSpan="5" className="text-center py-4">
-                    <i className="fas fa-info-circle me-2"></i>
-                    No equipment found matching the selected filters
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>
