@@ -11,43 +11,66 @@ function ResourceDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tenantName, setTenantName] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
-  useEffect(() => {
-    async function loadTenantData() {
-      try {
-        setLoading(true);
-        
-        // Special handling for tenant name
-        if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
-          setTenantName('Product CASE UAT');
-        }
-        
-        // Normal tenant handling from API
-        const tenantData = await fetchTenant(tenantId);
-        
-        if (tenantData) {
-          console.log('Loaded tenant data:', tenantData);
-          setResources(tenantData.resources || []);
-          setEvents(tenantData.events || []);
-          
-          if (!tenantName) {
-            setTenantName(tenantData.name || tenantId);
-          }
-        } else {
-          setError(`Tenant "${tenantId}" not found`);
-        }
-      } catch (err) {
-        console.error('Failed to load tenant data:', err);
-        setError(`Error loading tenant data: ${err.message}`);
-      } finally {
-        setLoading(false);
+  // Function to load tenant data - extracted for reuse with auto-refresh
+  const loadTenantData = async () => {
+    try {
+      setLoading(true);
+      
+      // Special handling for tenant name
+      if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
+        setTenantName('Product CASE UAT');
       }
+      
+      // Normal tenant handling from API
+      const tenantData = await fetchTenant(tenantId);
+      
+      if (tenantData) {
+        console.log('Loaded tenant data:', tenantData);
+        setResources(tenantData.resources || []);
+        setEvents(tenantData.events || []);
+        
+        if (!tenantName) {
+          setTenantName(tenantData.name || tenantId);
+        }
+        
+        console.log('Data refreshed at', new Date().toLocaleTimeString());
+      } else {
+        setError(`Tenant "${tenantId}" not found`);
+      }
+    } catch (err) {
+      console.error('Failed to load tenant data:', err);
+      setError(`Error loading tenant data: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  // Initial data load
+  useEffect(() => {
     if (tenantId) {
       loadTenantData();
     }
   }, [tenantId, tenantName]);
+  
+  // Auto-refresh setup
+  useEffect(() => {
+    let refreshInterval;
+    
+    if (autoRefresh) {
+      // Refresh data every 30 seconds
+      refreshInterval = setInterval(() => {
+        console.log('Auto-refreshing resource dashboard data...');
+        loadTenantData();
+      }, 30000);
+    }
+    
+    // Clean up interval on component unmount
+    return () => {
+      if (refreshInterval) clearInterval(refreshInterval);
+    };
+  }, [autoRefresh, tenantId]);
 
   // Calculate resource utilization
   const calculateUtilization = (resourceId) => {
@@ -115,8 +138,30 @@ function ResourceDashboard() {
       <div className="content-header">
         <h1>{getDisplayName()} - Resource Dashboard</h1>
         <div className="header-actions">
+          {/* Auto-refresh toggle */}
           <button 
-            className="btn btn-outline-secondary"
+            className={`btn ${autoRefresh ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
+          >
+            <i className={`fas fa-${autoRefresh ? 'sync-alt fa-spin' : 'sync-alt'} me-1`}></i>
+            {autoRefresh ? "Auto" : "Manual"}
+          </button>
+          
+          {/* Manual refresh button - only show when auto is off */}
+          {!autoRefresh && (
+            <button 
+              className="btn btn-outline-secondary ms-2"
+              onClick={loadTenantData}
+              title="Refresh data"
+            >
+              <i className="fas fa-redo-alt me-1"></i>
+              Refresh
+            </button>
+          )}
+          
+          <button 
+            className="btn btn-outline-secondary ms-2"
             onClick={() => navigate(`/${tenantId}`)}
           >
             <i className="fas fa-calendar-alt me-1"></i>
@@ -186,50 +231,57 @@ function ResourceDashboard() {
           </div>
           
           <h2 className="section-title">Equipment Status</h2>
-          <div className="resource-grid">
-            {resources.map(resource => {
-              const utilization = calculateUtilization(resource.id);
-              const status = getResourceStatus(resource.id);
-              
-              return (
-                <div className="resource-card" key={resource.id}>
-                  <div className={`resource-status ${status}`}>
-                    {status === 'available' ? 'Available' : 'In Use'}
-                  </div>
-                  <h3 className="resource-title">{resource.title}</h3>
-                  <div className="resource-utilization">
-                    <div className="utilization-label">Weekly Utilization</div>
-                    <div className="utilization-bar">
-                      <div 
-                        className="utilization-fill" 
-                        style={{ width: `${utilization.utilization}%` }}
-                      ></div>
+          {resources.length === 0 ? (
+            <div className="text-center py-4">
+              <i className="fas fa-microscope fa-3x mb-3 text-muted"></i>
+              <p>No equipment found. Equipment will appear here when added to calendar events.</p>
+            </div>
+          ) : (
+            <div className="resource-grid">
+              {resources.map(resource => {
+                const utilization = calculateUtilization(resource.id);
+                const status = getResourceStatus(resource.id);
+                
+                return (
+                  <div className="resource-card" key={resource.id}>
+                    <div className={`resource-status ${status}`}>
+                      {status === 'available' ? 'Available' : 'In Use'}
                     </div>
-                    <div className="utilization-value">{utilization.utilization}%</div>
-                  </div>
-                  <div className="resource-stats">
-                    <div className="resource-stat">
-                      <div className="stat-label">Bookings (This Week)</div>
-                      <div className="stat-value">{utilization.thisWeek}</div>
+                    <h3 className="resource-title">{resource.title}</h3>
+                    <div className="resource-utilization">
+                      <div className="utilization-label">Weekly Utilization</div>
+                      <div className="utilization-bar">
+                        <div 
+                          className="utilization-fill" 
+                          style={{ width: `${utilization.utilization}%` }}
+                        ></div>
+                      </div>
+                      <div className="utilization-value">{utilization.utilization}%</div>
                     </div>
-                    <div className="resource-stat">
-                      <div className="stat-label">Total Bookings</div>
-                      <div className="stat-value">{utilization.total}</div>
+                    <div className="resource-stats">
+                      <div className="resource-stat">
+                        <div className="stat-label">Bookings (This Week)</div>
+                        <div className="stat-value">{utilization.thisWeek}</div>
+                      </div>
+                      <div className="resource-stat">
+                        <div className="stat-label">Total Bookings</div>
+                        <div className="stat-value">{utilization.total}</div>
+                      </div>
+                    </div>
+                    <div className="resource-actions">
+                      <button 
+                        className="resource-btn resource-btn-primary"
+                        onClick={() => handleViewEquipmentCalendar(resource.id)}
+                      >
+                        <i className="fas fa-calendar-alt"></i>
+                        View Schedule
+                      </button>
                     </div>
                   </div>
-                  <div className="resource-actions">
-                    <button 
-                      className="resource-btn resource-btn-primary"
-                      onClick={() => handleViewEquipmentCalendar(resource.id)}
-                    >
-                      <i className="fas fa-calendar-alt"></i>
-                      View Schedule
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
