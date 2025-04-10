@@ -293,3 +293,123 @@ function Analytics() {
                   <tr key={equipment.id}>
                     <td>{equipment.name}</td>
                     <td>{equipment.count}
+                    <td>{equipment.count}</td>
+                    <td>
+                      <div className="utilization-bar" style={{ width: '150px', display: 'inline-block', marginRight: '10px' }}>
+                        <div className="utilization-fill" style={{ width: `${equipment.utilization}%` }}></div>
+                      </div>
+                      {equipment.utilization}%
+                    </td>
+                  </tr>
+                ))}
+                
+                {equipmentUtilization.length === 0 && (
+                  <tr>
+                    <td colSpan="3" className="text-center py-4">
+                      <i className="fas fa-info-circle me-2"></i>
+                      No equipment utilization data available
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          <div className="report-section">
+            <h2 className="section-title">Top Technicians</h2>
+            {topTechnicians.length > 0 ? (
+              <table className="report-table">
+                <thead>
+                  <tr>
+                    <th>Technician</th>
+                    <th>Reservations</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topTechnicians.map((technician, index) => (
+                    <tr key={index}>
+                      <td>{technician.name}</td>
+                      <td>{technician.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="text-center py-4">
+                <i className="fas fa-user-slash me-2"></i>
+                No technician data available
+              </div>
+            )}
+          </div>
+          
+          <div className="report-section">
+            <h2 className="section-title">Monthly Trends</h2>
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Reservations</th>
+                  <th>Trend</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyEventCounts.map((month, index) => (
+                  <tr key={index}>
+                    <td>{month.name} {month.year}</td>
+                    <td>{month.count}</td>
+                    <td>
+                      <div className="utilization-bar" style={{ width: '150px', display: 'inline-block' }}>
+                        <div 
+                          className="utilization-fill" 
+                          style={{ 
+                            width: `${Math.min(month.count * 5, 100)}%`,
+                            backgroundColor: month.count > 0 ? '#0047BB' : '#e9ecef'
+                          }}
+                        ></div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          <div className="report-section">
+            <h2 className="section-title">Recent Reservations</h2>
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Title</th>
+                  <th>Equipment</th>
+                  <th>Technician</th>
+                </tr>
+              </thead>
+              <tbody>
+                {getFilteredEvents().slice(0, 10).map((event, index) => (
+                  <tr key={index}>
+                    <td>{new Date(event.start).toLocaleDateString()}</td>
+                    <td>{event.title}</td>
+                    <td>{event.equipment || resources.find(r => r.id === event.resourceId)?.title || 'Unknown'}</td>
+                    <td>{event.technician || 'N/A'}</td>
+                  </tr>
+                ))}
+                
+                {getFilteredEvents().length === 0 && (
+                  <tr>
+                    <td colSpan="4" className="text-center py-4">
+                      <i className="fas fa-calendar-times me-2"></i>
+                      No reservations found in the selected time period
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default Analytics;                      
