@@ -17,7 +17,7 @@
   font-size: 1.8rem;
   font-weight: 500;
   margin: 0;
-  color: #0047BB;
+  color: #2196F3;
 }
 
 .header-actions {
@@ -83,7 +83,7 @@
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background-color: #0047BB;
+  background-color: #2196F3;
   color: white;
   display: flex;
   align-items: center;
@@ -112,7 +112,7 @@
   margin-bottom: 20px;
   padding-bottom: 10px;
   border-bottom: 1px solid #e9ecef;
-  color: #0047BB;
+  color: #2196F3;
 }
 
 .resource-grid {
@@ -182,7 +182,7 @@
 
 .utilization-fill {
   height: 100%;
-  background-color: #0047BB;
+  background-color: #2196F3;
   border-radius: 4px;
 }
 
@@ -238,7 +238,7 @@
 }
 
 .resource-btn-primary {
-  background-color: #0047BB;
+  background-color: #2196F3;
   color: white;
 }
 
@@ -375,7 +375,7 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background-color: #0047BB;
+  background-color: #2196F3;
   color: white;
   display: flex;
   align-items: center;
@@ -423,7 +423,7 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background-color: #0047BB;
+  background-color: #2196F3;
 }
 
 .timeline-content {
@@ -437,7 +437,7 @@
 .timeline-time {
   font-size: 14px;
   font-weight: 600;
-  color: #0047BB;
+  color: #2196F3;
   margin-bottom: 5px;
 }
 
@@ -536,7 +536,7 @@
   position: absolute;
   top: 7px;
   height: 25px;
-  background-color: #0047BB;
+  background-color: #2196F3;
   border-radius: 4px;
   color: white;
   display: flex;
