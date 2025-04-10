@@ -12,74 +12,101 @@ function TechnicianSchedule() {
   const [tenantName, setTenantName] = useState('');
   const [technicians, setTechnicians] = useState([]);
   const [selectedTechnician, setSelectedTechnician] = useState('all');
+  const [autoRefresh, setAutoRefresh] = useState(true);
   
-  useEffect(() => {
-    async function loadTenantData() {
-      try {
-        setLoading(true);
-        
-        // Special handling for tenant name
-        if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
-          setTenantName('Product CASE UAT');
-        }
-        
-        // Normal tenant handling from API
-        const tenantData = await fetchTenant(tenantId);
-        if (tenantData) {
-          console.log('Loaded tenant data:', tenantData);
-          const allEvents = tenantData.events || [];
-          setEvents(allEvents);
-          
-          // Extract unique technicians from events
-          const uniqueTechnicians = Array.from(
-            new Set(
-              allEvents
-                .filter(event => event.technician)
-                .map(event => event.technician)
-            )
-          );
-          
-          // If no technicians are found in events, use some default ones
-          if (uniqueTechnicians.length === 0) {
-            setTechnicians(['Dr. Smith', 'Dr. Johnson', 'Lab Tech Sarah']);
-          } else {
-            setTechnicians(uniqueTechnicians);
-          }
-          
-          if (!tenantName) {
-            setTenantName(tenantData.name || tenantId);
-          }
-        } else {
-          setError(`Tenant "${tenantId}" not found`);
-        }
-      } catch (err) {
-        console.error('Failed to load tenant data:', err);
-        setError(`Error loading tenant data: ${err.message}`);
-      } finally {
-        setLoading(false);
+  // Load tenant data function - extracted for reuse with auto-refresh
+  const loadTenantData = async () => {
+    try {
+      setLoading(true);
+      
+      // Special handling for tenant name
+      if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
+        setTenantName('Product CASE UAT');
       }
+      
+      // Normal tenant handling from API
+      const tenantData = await fetchTenant(tenantId);
+      
+      if (tenantData) {
+        console.log('Loaded tenant data:', tenantData);
+        const allEvents = tenantData.events || [];
+        setEvents(allEvents);
+        
+        // Extract unique technicians from events
+        const uniqueTechnicians = Array.from(
+          new Set(
+            allEvents
+              .filter(event => event.technician)
+              .map(event => event.technician)
+          )
+        );
+        
+        console.log('Extracted technicians from events:', uniqueTechnicians);
+        
+        // Only use default technicians if none found in events
+        if (uniqueTechnicians.length === 0) {
+          // Don't use fake names anymore since they're not in events
+          setTechnicians([]);
+        } else {
+          setTechnicians(uniqueTechnicians);
+          
+          // Auto-select the first technician if one exists and none is selected
+          if (selectedTechnician === 'all' && uniqueTechnicians.length > 0) {
+            setSelectedTechnician(uniqueTechnicians[0]);
+          }
+        }
+        
+        if (!tenantName) {
+          setTenantName(tenantData.name || tenantId);
+        }
+      } else {
+        setError(`Tenant "${tenantId}" not found`);
+      }
+    } catch (err) {
+      console.error('Failed to load tenant data:', err);
+      setError(`Error loading tenant data: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
-
+  };
+  
+  // Load data initially
+  useEffect(() => {
     if (tenantId) {
       loadTenantData();
     }
   }, [tenantId, tenantName]);
+  
+  // Auto-refresh setup
+  useEffect(() => {
+    let refreshInterval;
+    
+    if (autoRefresh) {
+      // Refresh data every 30 seconds
+      refreshInterval = setInterval(() => {
+        console.log('Auto-refreshing technician data...');
+        loadTenantData();
+      }, 30000);
+    }
+    
+    // Clean up interval on component unmount or when autoRefresh changes
+    return () => {
+      if (refreshInterval) clearInterval(refreshInterval);
+    };
+  }, [autoRefresh, tenantId]);
 
   // Get technician's events
   const getTechnicianEvents = (technicianName) => {
-    // If 'all' is selected, return events for the first technician as a fallback
-    const targetTechnician = technicianName === 'all' 
-      ? (technicians.length > 0 ? technicians[0] : null)
-      : technicianName;
+    // If 'all' is selected, return events for any technician
+    if (technicianName === 'all') {
+      return events
+        .filter(event => event.technician)
+        .sort((a, b) => new Date(a.start) - new Date(b.start));
+    }
     
-    if (!targetTechnician) return [];
-    
-    // Filter events by technician and sort chronologically
+    // Otherwise filter events by the specific technician and sort chronologically
     return events
-      .filter(event => 
-        event.technician === targetTechnician ||
-        (technicianName === 'all' && event.technician)
-      )
+      .filter(event => event.technician === technicianName)
       .sort((a, b) => new Date(a.start) - new Date(b.start));
   };
 
@@ -137,17 +164,37 @@ function TechnicianSchedule() {
   };
 
   // Get events for selected technician
-  const filteredEvents = selectedTechnician === 'all'
-    ? events.filter(event => event.technician)
-    : getTechnicianEvents(selectedTechnician);
+  const filteredEvents = getTechnicianEvents(selectedTechnician);
 
   return (
     <div className="dashboard-container">
       <div className="content-header">
         <h1>{getDisplayName()} - Technician Schedule</h1>
         <div className="header-actions">
+          {/* Auto-refresh toggle */}
           <button 
-            className="btn btn-outline-secondary"
+            className={`btn ${autoRefresh ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
+          >
+            <i className={`fas fa-${autoRefresh ? 'sync-alt fa-spin' : 'sync-alt'} me-1`}></i>
+            {autoRefresh ? "Auto" : "Manual"}
+          </button>
+          
+          {/* Manual refresh button - only show when auto is off */}
+          {!autoRefresh && (
+            <button 
+              className="btn btn-outline-secondary ms-2"
+              onClick={loadTenantData}
+              title="Refresh data"
+            >
+              <i className="fas fa-redo-alt me-1"></i>
+              Refresh
+            </button>
+          )}
+          
+          <button 
+            className="btn btn-outline-secondary ms-2"
             onClick={() => navigate(`/${tenantId}`)}
           >
             <i className="fas fa-calendar-alt me-1"></i>
@@ -200,7 +247,12 @@ function TechnicianSchedule() {
           
           <h2 className="section-title">Scheduled Assignments</h2>
           
-          {filteredEvents.length === 0 ? (
+          {technicians.length === 0 ? (
+            <div className="text-center py-4">
+              <i className="fas fa-user-slash fa-3x mb-3 text-muted"></i>
+              <p>No technicians found in any events. Try adding technician information to your calendar events.</p>
+            </div>
+          ) : filteredEvents.length === 0 ? (
             <div className="text-center py-4">
               <i className="fas fa-calendar-times fa-3x mb-3 text-muted"></i>
               <p>No scheduled assignments found for {selectedTechnician === 'all' ? 'technicians' : selectedTechnician}</p>
