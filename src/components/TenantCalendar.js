@@ -140,12 +140,12 @@ function TenantCalendar() {
   
   // Set up automatic background refresh
   useEffect(() => {
-    // Refresh data every 30 seconds
+    // Refresh data every 10 seconds
     const refreshInterval = setInterval(() => {
       if (isMounted.current) {
         handleReloadData(false);
       }
-    }, 30000);
+    }, 10000);
     
     // Clean up interval on component unmount
     return () => {
