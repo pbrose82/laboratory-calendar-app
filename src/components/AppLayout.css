@@ -1,7 +1,7 @@
 /* AppLayout.css - Styles for the layout with left navigation */
 
 :root {
-  --primary-color: #1565C0; /* Updated to new blue color */
+  --primary-color: #2196F3; /* Alchemy blue */
   --dark-blue: #0D47A1; /* Darker shade for hover states */
   --text-white: #FFF;
   --text-white-opacity: rgba(255, 255, 255, 0.72);
@@ -53,6 +53,7 @@ body {
 
 .c-sidenav--mini {
   width: var(--nav-width-collapsed);
+  overflow: hidden; /* Prevent content overflow */
 }
 
 /* Sidenav header */
@@ -198,6 +199,11 @@ body {
   height: 24px;
 }
 
+/* Ensure icons are properly centered in collapsed mode */
+.c-sidenav--mini .c-icon--medium {
+  margin: 0 auto; /* Center icons horizontally */
+}
+
 .u-background-transparent {
   background-color: transparent;
 }
@@ -249,6 +255,23 @@ body {
   padding: 10px 0;
   text-align: center;
   font-size: 12px;
+  margin-top: auto; /* Ensure it stays at the bottom */
+}
+
+/* Fix copyright text in collapsed mode */
+.c-sidenav--mini .c-sidenav__copy {
+  padding: 10px 0;
+  height: 32px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Ensure the copyright text is properly sized and positioned */
+.c-sidenav--mini .c-sidenav__copy span {
+  font-size: 10px;
+  white-space: nowrap;
 }
 
 .u-padding-vertical-s {
@@ -266,6 +289,17 @@ body {
 
 .u-height-32 {
   height: 32px;
+}
+
+/* Main layout structure */
+.c-sidenav {
+  display: flex;
+  flex-direction: column;
+}
+
+.js-views-and-assignments {
+  flex: 1;
+  overflow-y: auto;
 }
 
 /* Main Content */
