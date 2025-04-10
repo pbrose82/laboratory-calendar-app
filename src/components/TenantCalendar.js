@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useRef } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -46,6 +46,7 @@ const ensureISODateFormat = (events) => {
 function TenantCalendar() {
   const { tenantId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [events, setEvents] = useState([]);
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -53,68 +54,104 @@ function TenantCalendar() {
   const [tenantName, setTenantName] = useState('');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [showWeekends, setShowWeekends] = useState(true);
+  
+  // Reference to track if component is mounted
+  const isMounted = useRef(true);
+  
+  // Get resource filter from URL query params if present
+  const searchParams = new URLSearchParams(location.search);
+  const resourceFilter = searchParams.get('resourceId');
 
+  // Function to load tenant data - now handles both initial load and background refresh
+  const handleReloadData = async (isInitialLoad = false) => {
+    try {
+      if (isInitialLoad) {
+        setLoading(true);
+      }
+      
+      // Special handling for demo tenant
+      if (tenantId === 'demo-tenant') {
+        // For demo tenant, check if we have saved data in localStorage
+        const savedDemoData = localStorage.getItem('demo-tenant-events');
+        if (savedDemoData) {
+          setEvents(JSON.parse(savedDemoData));
+        } else {
+          setEvents(demoTenantEvents);
+          // Save initial demo data to localStorage
+          localStorage.setItem('demo-tenant-events', JSON.stringify(demoTenantEvents));
+        }
+        setResources(demoTenantResources);
+        setTenantName('Demo Tenant');
+        if (isInitialLoad) {
+          setLoading(false);
+        }
+        return;
+      }
+      
+      // Special handling for Product CASE UAT tenant
+      if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
+        setTenantName('Product CASE UAT');
+      }
+      
+      // Normal tenant handling from API
+      const tenantData = await fetchTenant(tenantId);
+      
+      if (tenantData && isMounted.current) {
+        // Process events to ensure ISO date format
+        const formattedEvents = ensureISODateFormat(tenantData.events || []);
+        setEvents(formattedEvents);
+        
+        setResources(tenantData.resources || []);
+        if (!tenantName) {
+          setTenantName(tenantData.name || tenantId);
+        }
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Calendar data refreshed at', new Date().toLocaleTimeString());
+        }
+      }
+    } catch (err) {
+      if (isMounted.current) {
+        console.error('Failed to load tenant data:', err);
+        setError(`Error loading tenant data: ${err.message}`);
+      }
+    } finally {
+      if (isInitialLoad && isMounted.current) {
+        setLoading(false);
+      }
+    }
+  };
+
+  // Initial data load and auth check
   useEffect(() => {
     // Check if admin is authenticated
     const adminAuth = sessionStorage.getItem('adminAuthenticated');
     setIsAdminAuthenticated(adminAuth === 'true');
     
-    async function loadTenantData() {
-      try {
-        setLoading(true);
-        
-        // Special handling for demo tenant
-        if (tenantId === 'demo-tenant') {
-          // For demo tenant, check if we have saved data in localStorage
-          const savedDemoData = localStorage.getItem('demo-tenant-events');
-          if (savedDemoData) {
-            setEvents(JSON.parse(savedDemoData));
-          } else {
-            setEvents(demoTenantEvents);
-            // Save initial demo data to localStorage
-            localStorage.setItem('demo-tenant-events', JSON.stringify(demoTenantEvents));
-          }
-          setResources(demoTenantResources);
-          setTenantName('Demo Tenant');
-          setLoading(false);
-          return;
-        }
-        
-        // Special handling for Product CASE UAT tenant
-        if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
-          setTenantName('Product CASE UAT');
-        }
-        
-        // Normal tenant handling from API
-        const tenantData = await fetchTenant(tenantId);
-        
-        if (tenantData) {
-          console.log('Loaded tenant data:', tenantData);
-          
-          // Process events to ensure ISO date format
-          const formattedEvents = ensureISODateFormat(tenantData.events || []);
-          console.log('Events after date format validation:', formattedEvents);
-          setEvents(formattedEvents);
-          
-          setResources(tenantData.resources || []);
-          if (!tenantName) {
-            setTenantName(tenantData.name || tenantId);
-          }
-        } else {
-          setError(`Tenant "${tenantId}" not found`);
-        }
-      } catch (err) {
-        console.error('Failed to load tenant data:', err);
-        setError(`Error loading tenant data: ${err.message}`);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     if (tenantId) {
-      loadTenantData();
+      handleReloadData(true);
     }
-}, [tenantId, tenantName]);
+    
+    // Cleanup function
+    return () => {
+      isMounted.current = false;
+    };
+  }, [tenantId]);
+  
+  // Set up automatic background refresh
+  useEffect(() => {
+    // Refresh data every 10 seconds
+    const refreshInterval = setInterval(() => {
+      if (isMounted.current) {
+        handleReloadData(false);
+      }
+    }, 10000);
+    
+    // Clean up interval on component unmount
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [tenantId]);
 
   const handleDateSelect = async (selectInfo) => {
     const title = prompt('Please enter a new event title:');
@@ -180,7 +217,7 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
     // Add all properties that might exist
     // First check top-level props, then check extendedProps
     const checkAndAddProp = (propName, label) => {
-      // First check if it's directly in event object or in _def object
+      // First check if it's directly in event object
       if (event[propName] !== undefined) {
         detailsMessage += `\n${label}: ${event[propName]}`;
       } 
@@ -201,7 +238,28 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
     checkAndAddProp('notes', 'Notes');
     checkAndAddProp('recordId', 'Record ID');
     
-    // Show the alert with all details
+    // Check if there's an event link and handle it
+    const eventLink = event.extendedProps?.eventLink || event.eventLink;
+    if (eventLink) {
+      // Extract link from the eventLink text if it contains a URL
+      const linkMatch = eventLink.match(/(https:\/\/[^\s]+)/);
+      if (linkMatch && linkMatch[0]) {
+        const url = linkMatch[0];
+        // Add the link info to the details message
+        detailsMessage += `\n\nAlchemy Record: ${url}`;
+        
+        // Ask if the user wants to open the link
+        if (window.confirm(`${detailsMessage}\n\nDo you want to open the Alchemy record?`)) {
+          window.open(url, '_blank');
+          return; // Return early since we already showed the confirm dialog
+        }
+      } else {
+        // If no URL could be extracted, just display the eventLink text
+        detailsMessage += `\n\nEvent Link: ${eventLink}`;
+      }
+    }
+    
+    // Show the alert with all details (only if we didn't already show a confirm dialog)
     alert(detailsMessage);
   };
   
@@ -283,28 +341,6 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
     }
   };
 
-  // Reload data from server
-  const handleReloadData = async () => {
-    try {
-      setLoading(true);
-      const tenantData = await fetchTenant(tenantId);
-      
-      if (tenantData) {
-        const formattedEvents = ensureISODateFormat(tenantData.events || []);
-        setEvents(formattedEvents);
-        setResources(tenantData.resources || []);
-        if (!tenantName) {
-          setTenantName(tenantData.name || tenantId);
-        }
-      }
-    } catch (error) {
-      console.error('Error reloading data:', error);
-      alert(`Error reloading data: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="dashboard-container">
       <div className="content-header">
@@ -317,16 +353,6 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
           >
             <i className="fas fa-calendar-week me-1"></i>
             {showWeekends ? "Hide Weekends" : "Show Weekends"}
-          </button>
-          
-          {/* Reload data button */}
-          <button 
-            className="btn btn-outline-secondary ms-2"
-            onClick={handleReloadData}
-            title="Reload data from server"
-          >
-            <i className="fas fa-sync-alt me-1"></i>
-            Reload
           </button>
           
           {/* Back button */}
@@ -391,6 +417,9 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
             allDayText="all-day"
             weekends={showWeekends} // Control weekends visibility
             
+            // Filter by resource if resourceId is provided in URL
+            resourceId={resourceFilter}
+            
             // Add this eventDataTransform function to handle both top-level and nested properties
             eventDataTransform={(event) => {
               // For handling the transition from nested to top-level properties
@@ -405,7 +434,7 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
               // List of properties that might be at top level or in extendedProps
               const propsToCheck = [
                 'location', 'equipment', 'technician', 'notes', 
-                'recordId', 'sampleType', 'reminders'
+                'recordId', 'sampleType', 'reminders', 'eventLink'
               ];
               
               // Ensure all properties are accessible in both places

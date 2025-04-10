@@ -140,7 +140,11 @@ app.post('/api/calendar-events', (req, res) => {
         notes: body.notes,
         recordId: body.recordId,
         sampleType: body.sampleType,
-        reminders: body.reminders
+        reminders: body.reminders,
+        // Add the new eventLink field
+        eventLink: body.eventLink || (body.recordId ? 
+          `EquipmentReservation \nRecordID: ${body.recordId}\nLink to record: https://app.alchemy.cloud/${body.tenantId}/record/${body.recordId}` : 
+          undefined)
       };
       
       // Convert dates to ISO format for FullCalendar compatibility
@@ -165,7 +169,64 @@ app.post('/api/calendar-events', (req, res) => {
         console.error('Error converting dates to ISO format:', dateError);
         // Continue with original format if conversion fails
       }
-      
+
+      // Add this to the section where you process the hybrid format from Alchemy in server.js
+// This should be added right after the date conversion code but before creating the tenant
+
+// Extract and add any new equipment mentioned in events
+if (body.equipment && !tenants[tenantId]?.resources?.some(r => r.title === body.equipment)) {
+  // Generate a new unique ID for this equipment
+  const newEquipmentId = `equipment-${Date.now()}`;
+  
+  // Create tenant if needed
+  if (!tenants[tenantId]) {
+    console.log(`Creating new tenant: ${tenantId}`);
+    tenants[tenantId] = {
+      id: tenantId,
+      name: tenantId,
+      createdAt: new Date().toISOString(),
+      events: [],
+      resources: []
+    };
+  }
+  
+  // Initialize resources array if it doesn't exist
+  if (!tenants[tenantId].resources) {
+    tenants[tenantId].resources = [];
+  }
+  
+  // Add to resources array
+  tenants[tenantId].resources.push({
+    id: newEquipmentId,
+    title: body.equipment,
+    type: 'equipment'
+  });
+  
+  console.log(`Added new equipment "${body.equipment}" with ID "${newEquipmentId}"`);
+  
+  // Connect this event to the new resource
+  eventData.resourceId = newEquipmentId;
+}
+
+// Also add similar logic to the standard API format section - inside the 'create' case:
+
+// Extract and add any new equipment mentioned
+if (eventData.equipment && !tenants[tenantId].resources.some(r => r.title === eventData.equipment)) {
+  // Generate a new unique ID for this equipment
+  const newEquipmentId = `equipment-${Date.now()}`;
+  
+  // Add to resources array
+  tenants[tenantId].resources.push({
+    id: newEquipmentId,
+    title: eventData.equipment,
+    type: 'equipment'
+  });
+  
+  console.log(`Added new equipment "${eventData.equipment}" with ID "${newEquipmentId}"`);
+  
+  // Connect this event to the new resource
+  eventData.resourceId = newEquipmentId;
+}
       // If equipment is specified, try to match it with a resource
       if (body.equipment) {
         // Find the matching resource based on equipment name
@@ -211,11 +272,7 @@ app.post('/api/calendar-events', (req, res) => {
             name: tenantId,
             createdAt: new Date().toISOString(),
             events: [],
-            resources: [
-              { id: 'equipment-1', title: 'HPLC Machine' },
-              { id: 'equipment-2', title: 'Mass Spectrometer' },
-              { id: 'equipment-3', title: 'PCR Machine' }
-            ]
+            resources: []
           };
         }
         
@@ -263,7 +320,11 @@ app.post('/api/calendar-events', (req, res) => {
         notes: body.description,
         recordId: body.recordId,
         sampleType: body.sampleType,
-        reminders: body.reminders
+        reminders: body.reminders,
+        // Add the eventLink field for legacy format too
+        eventLink: body.eventLink || (body.recordId ? 
+          `EquipmentReservation \nRecordID: ${body.recordId}\nLink to record: https://app.alchemy.cloud/${tenantId}/record/${body.recordId}` : 
+          undefined)
       };
       
       // Convert dates to ISO format for FullCalendar compatibility
@@ -286,11 +347,7 @@ app.post('/api/calendar-events', (req, res) => {
           name: tenantId,
           createdAt: new Date().toISOString(),
           events: [],
-          resources: [
-            { id: 'equipment-1', title: 'HPLC Machine' },
-            { id: 'equipment-2', title: 'Mass Spectrometer' },
-            { id: 'equipment-3', title: 'PCR Machine' }
-          ]
+          resources: []
         };
       }
       
@@ -355,11 +412,7 @@ app.post('/api/calendar-events', (req, res) => {
           name: tenantId,
           createdAt: new Date().toISOString(),
           events: [],
-          resources: [
-            { id: 'equipment-1', title: 'HPLC Machine' },
-            { id: 'equipment-2', title: 'Mass Spectrometer' },
-            { id: 'equipment-3', title: 'PCR Machine' }
-          ]
+          resources: []
         };
       }
       
@@ -406,6 +459,11 @@ app.post('/api/calendar-events', (req, res) => {
             }
           } catch (dateError) {
             console.error('Error converting dates in standard format:', dateError);
+          }
+          
+          // Add eventLink if recordId exists but eventLink doesn't
+          if (eventData.recordId && !eventData.eventLink) {
+            eventData.eventLink = `EquipmentReservation \nRecordID: ${eventData.recordId}\nLink to record: https://app.alchemy.cloud/${tenantId}/record/${eventData.recordId}`;
           }
           
           // If this is an update (existing event found), update it
@@ -457,6 +515,11 @@ app.post('/api/calendar-events', (req, res) => {
               console.error('Error converting dates in update:', dateError);
             }
             
+            // Update eventLink if recordId exists but eventLink doesn't
+            if (eventData.recordId && !eventData.eventLink) {
+              eventData.eventLink = `EquipmentReservation \nRecordID: ${eventData.recordId}\nLink to record: https://app.alchemy.cloud/${tenantId}/record/${eventData.recordId}`;
+            }
+            
             tenants[tenantId].events[eventIndex] = {
               ...tenants[tenantId].events[eventIndex],
               ...eventData
@@ -495,6 +558,11 @@ app.post('/api/calendar-events', (req, res) => {
               }
             } catch (dateError) {
               console.error('Error converting dates in update by ER number:', dateError);
+            }
+            
+            // Update eventLink if recordId exists but eventLink doesn't
+            if (eventData.recordId && !eventData.eventLink) {
+              eventData.eventLink = `EquipmentReservation \nRecordID: ${eventData.recordId}\nLink to record: https://app.alchemy.cloud/${tenantId}/record/${eventData.recordId}`;
             }
             
             tenants[tenantId].events[eventIndex] = {
@@ -572,6 +640,43 @@ app.post('/api/calendar-events', (req, res) => {
   }
 });
 
+// Add this to your server.js file
+app.delete('/api/equipment/:equipmentId', (req, res) => {
+  try {
+    const { equipmentId } = req.params;
+    const { tenantId } = req.query;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID is required' });
+    }
+    
+    if (!tenants[tenantId]) {
+      return res.status(404).json({ error: `Tenant "${tenantId}" not found` });
+    }
+    
+    // Find the equipment index
+    const resourceIndex = tenants[tenantId].resources.findIndex(r => r.id === equipmentId);
+    
+    if (resourceIndex === -1) {
+      return res.status(404).json({ error: `Equipment "${equipmentId}" not found for tenant "${tenantId}"` });
+    }
+    
+    // Remove the equipment
+    tenants[tenantId].resources.splice(resourceIndex, 1);
+    
+    // Save tenant data after modification
+    saveTenantData();
+    
+    return res.json({ 
+      success: true, 
+      message: `Equipment "${equipmentId}" removed successfully`
+    });
+  } catch (error) {
+    console.error('Error removing equipment:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 /**
  * API endpoint to register a new tenant
  */
@@ -592,11 +697,7 @@ app.post('/api/tenants', (req, res) => {
       name: tenantName,
       createdAt: new Date().toISOString(),
       events: [],
-      resources: [
-        { id: 'equipment-1', title: 'HPLC Machine' },
-        { id: 'equipment-2', title: 'Mass Spectrometer' },
-        { id: 'equipment-3', title: 'PCR Machine' }
-      ]
+      resources: []
     };
     
     // Save tenant data after creating a new tenant
@@ -794,6 +895,11 @@ app.put('/api/calendar-events/:eventId', (req, res) => {
       }
     } catch (dateError) {
       console.error('Error converting dates in PUT update:', dateError);
+    }
+    
+    // Update eventLink if recordId exists but eventLink doesn't
+    if (updateData.recordId && !updateData.eventLink) {
+      updateData.eventLink = `EquipmentReservation \nRecordID: ${updateData.recordId}\nLink to record: https://app.alchemy.cloud/${tenantId}/record/${updateData.recordId}`;
     }
     
     tenants[tenantId].events[eventIndex] = {

@@ -4,6 +4,11 @@ import LaboratoryCalendar from './components/LaboratoryCalendar';
 import AdminPage from './components/AdminPage';
 import AdminLogin from './components/AdminLogin';
 import TenantCalendar from './components/TenantCalendar';
+import ResourceDashboard from './components/ResourceDashboard';
+import EquipmentList from './components/EquipmentList';
+import TechnicianSchedule from './components/TechnicianSchedule';
+import GanttChart from './components/GanttChart';
+import Analytics from './components/Analytics';
 import AppLayout from './components/AppLayout';
 import './App.css';
 
@@ -31,6 +36,13 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/:tenantId" element={<TenantCalendar />} />
+          
+          {/* New Resource Planning Routes */}
+          <Route path="/:tenantId/resource-dashboard" element={<ResourceDashboard />} />
+          <Route path="/:tenantId/equipment-list" element={<EquipmentList />} />
+          <Route path="/:tenantId/technician-schedule" element={<TechnicianSchedule />} />
+          <Route path="/:tenantId/gantt-chart" element={<GanttChart />} />
+          <Route path="/:tenantId/analytics" element={<Analytics />} />
         </Routes>
       </AppLayout>
     </Router>
