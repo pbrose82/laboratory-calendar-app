@@ -96,15 +96,27 @@ function AppLayout({ children }) {
           {/* Navigation Menu */}
           <div className="u-overflow-auto js-views-and-assignments u-1/1">
             <div className={isExpanded ? '' : 'c-nav-mini-menu--height u-overflow-y-auto u-overflow-x-hidden'}>
-              <Link to="/" 
-                    className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${location.pathname === '/' ? 'c-selectable-item__dark--active' : ''}`}
-                    title={isExpanded ? null : 'Dashboard'}>
+              {/* Dashboard button - now links to Alchemy dashboard when tenant is selected */}
+              <a href={tenantId ? `https://app.alchemy.cloud/${tenantId}/dashboard` : '/'}
+                 className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l`}
+                 target="_blank" 
+                 rel="noopener noreferrer"
+                 title={isExpanded ? null : 'Alchemy Dashboard'}>
                 <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
                   <i className="fas fa-th-large u-color-white-opacity-72"></i>
                 </div>
-                {isExpanded && <span className="t-4">Dashboard</span>}
-              </Link>
+                {isExpanded && <span className="t-4">Alchemy Dashboard</span>}
+              </a>
 
+              <Link to="/"
+                    className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${location.pathname === '/' ? 'c-selectable-item__dark--active' : ''}`}
+                    title={isExpanded ? null : 'Calendar Home'}>
+                <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                  <i className="fas fa-home u-color-white-opacity-72"></i>
+                </div>
+                {isExpanded && <span className="t-4">Calendar Home</span>}
+              </Link>
+              
               {/* Only show tenant-specific menu items if a tenant is selected */}
               {tenantId && (
                 <>
