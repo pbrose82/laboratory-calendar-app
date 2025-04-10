@@ -169,7 +169,64 @@ app.post('/api/calendar-events', (req, res) => {
         console.error('Error converting dates to ISO format:', dateError);
         // Continue with original format if conversion fails
       }
-      
+
+      // Add this to the section where you process the hybrid format from Alchemy in server.js
+// This should be added right after the date conversion code but before creating the tenant
+
+// Extract and add any new equipment mentioned in events
+if (body.equipment && !tenants[tenantId]?.resources?.some(r => r.title === body.equipment)) {
+  // Generate a new unique ID for this equipment
+  const newEquipmentId = `equipment-${Date.now()}`;
+  
+  // Create tenant if needed
+  if (!tenants[tenantId]) {
+    console.log(`Creating new tenant: ${tenantId}`);
+    tenants[tenantId] = {
+      id: tenantId,
+      name: tenantId,
+      createdAt: new Date().toISOString(),
+      events: [],
+      resources: []
+    };
+  }
+  
+  // Initialize resources array if it doesn't exist
+  if (!tenants[tenantId].resources) {
+    tenants[tenantId].resources = [];
+  }
+  
+  // Add to resources array
+  tenants[tenantId].resources.push({
+    id: newEquipmentId,
+    title: body.equipment,
+    type: 'equipment'
+  });
+  
+  console.log(`Added new equipment "${body.equipment}" with ID "${newEquipmentId}"`);
+  
+  // Connect this event to the new resource
+  eventData.resourceId = newEquipmentId;
+}
+
+// Also add similar logic to the standard API format section - inside the 'create' case:
+
+// Extract and add any new equipment mentioned
+if (eventData.equipment && !tenants[tenantId].resources.some(r => r.title === eventData.equipment)) {
+  // Generate a new unique ID for this equipment
+  const newEquipmentId = `equipment-${Date.now()}`;
+  
+  // Add to resources array
+  tenants[tenantId].resources.push({
+    id: newEquipmentId,
+    title: eventData.equipment,
+    type: 'equipment'
+  });
+  
+  console.log(`Added new equipment "${eventData.equipment}" with ID "${newEquipmentId}"`);
+  
+  // Connect this event to the new resource
+  eventData.resourceId = newEquipmentId;
+}
       // If equipment is specified, try to match it with a resource
       if (body.equipment) {
         // Find the matching resource based on equipment name
