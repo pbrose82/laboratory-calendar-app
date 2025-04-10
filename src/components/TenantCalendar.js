@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -46,6 +46,7 @@ const ensureISODateFormat = (events) => {
 function TenantCalendar() {
   const { tenantId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [events, setEvents] = useState([]);
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -53,68 +54,95 @@ function TenantCalendar() {
   const [tenantName, setTenantName] = useState('');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [showWeekends, setShowWeekends] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  
+  // Get resource filter from URL query params if present
+  const searchParams = new URLSearchParams(location.search);
+  const resourceFilter = searchParams.get('resourceId');
 
+  // Function to load tenant data - extracted for reuse with auto-refresh
+  const handleReloadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Special handling for demo tenant
+      if (tenantId === 'demo-tenant') {
+        // For demo tenant, check if we have saved data in localStorage
+        const savedDemoData = localStorage.getItem('demo-tenant-events');
+        if (savedDemoData) {
+          setEvents(JSON.parse(savedDemoData));
+        } else {
+          setEvents(demoTenantEvents);
+          // Save initial demo data to localStorage
+          localStorage.setItem('demo-tenant-events', JSON.stringify(demoTenantEvents));
+        }
+        setResources(demoTenantResources);
+        setTenantName('Demo Tenant');
+        setLoading(false);
+        return;
+      }
+      
+      // Special handling for Product CASE UAT tenant
+      if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
+        setTenantName('Product CASE UAT');
+      }
+      
+      // Normal tenant handling from API
+      const tenantData = await fetchTenant(tenantId);
+      
+      if (tenantData) {
+        console.log('Loaded tenant data:', tenantData);
+        
+        // Process events to ensure ISO date format
+        const formattedEvents = ensureISODateFormat(tenantData.events || []);
+        console.log('Events after date format validation:', formattedEvents);
+        setEvents(formattedEvents);
+        
+        setResources(tenantData.resources || []);
+        if (!tenantName) {
+          setTenantName(tenantData.name || tenantId);
+        }
+        
+        console.log('Calendar data refreshed at', new Date().toLocaleTimeString());
+      } else {
+        setError(`Tenant "${tenantId}" not found`);
+      }
+    } catch (err) {
+      console.error('Failed to load tenant data:', err);
+      setError(`Error loading tenant data: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial data load and auth check
   useEffect(() => {
     // Check if admin is authenticated
     const adminAuth = sessionStorage.getItem('adminAuthenticated');
     setIsAdminAuthenticated(adminAuth === 'true');
     
-    async function loadTenantData() {
-      try {
-        setLoading(true);
-        
-        // Special handling for demo tenant
-        if (tenantId === 'demo-tenant') {
-          // For demo tenant, check if we have saved data in localStorage
-          const savedDemoData = localStorage.getItem('demo-tenant-events');
-          if (savedDemoData) {
-            setEvents(JSON.parse(savedDemoData));
-          } else {
-            setEvents(demoTenantEvents);
-            // Save initial demo data to localStorage
-            localStorage.setItem('demo-tenant-events', JSON.stringify(demoTenantEvents));
-          }
-          setResources(demoTenantResources);
-          setTenantName('Demo Tenant');
-          setLoading(false);
-          return;
-        }
-        
-        // Special handling for Product CASE UAT tenant
-        if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
-          setTenantName('Product CASE UAT');
-        }
-        
-        // Normal tenant handling from API
-        const tenantData = await fetchTenant(tenantId);
-        
-        if (tenantData) {
-          console.log('Loaded tenant data:', tenantData);
-          
-          // Process events to ensure ISO date format
-          const formattedEvents = ensureISODateFormat(tenantData.events || []);
-          console.log('Events after date format validation:', formattedEvents);
-          setEvents(formattedEvents);
-          
-          setResources(tenantData.resources || []);
-          if (!tenantName) {
-            setTenantName(tenantData.name || tenantId);
-          }
-        } else {
-          setError(`Tenant "${tenantId}" not found`);
-        }
-      } catch (err) {
-        console.error('Failed to load tenant data:', err);
-        setError(`Error loading tenant data: ${err.message}`);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     if (tenantId) {
-      loadTenantData();
+      handleReloadData();
     }
   }, [tenantId, tenantName]);
+  
+  // Set up auto-refresh
+  useEffect(() => {
+    let refreshInterval;
+    
+    if (autoRefresh) {
+      // Refresh data every 30 seconds
+      refreshInterval = setInterval(() => {
+        console.log('Auto-refreshing calendar data...');
+        handleReloadData();
+      }, 30000);
+    }
+    
+    // Clean up interval on component unmount
+    return () => {
+      if (refreshInterval) clearInterval(refreshInterval);
+    };
+  }, [autoRefresh]);
 
   const handleDateSelect = async (selectInfo) => {
     const title = prompt('Please enter a new event title:');
@@ -180,7 +208,7 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
     // Add all properties that might exist
     // First check top-level props, then check extendedProps
     const checkAndAddProp = (propName, label) => {
-      // First check if it's directly in event object or in _def object
+      // First check if it's directly in event object
       if (event[propName] !== undefined) {
         detailsMessage += `\n${label}: ${event[propName]}`;
       } 
@@ -304,28 +332,6 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
     }
   };
 
-  // Reload data from server
-  const handleReloadData = async () => {
-    try {
-      setLoading(true);
-      const tenantData = await fetchTenant(tenantId);
-      
-      if (tenantData) {
-        const formattedEvents = ensureISODateFormat(tenantData.events || []);
-        setEvents(formattedEvents);
-        setResources(tenantData.resources || []);
-        if (!tenantName) {
-          setTenantName(tenantData.name || tenantId);
-        }
-      }
-    } catch (error) {
-      console.error('Error reloading data:', error);
-      alert(`Error reloading data: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="dashboard-container">
       <div className="content-header">
@@ -340,15 +346,27 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
             {showWeekends ? "Hide Weekends" : "Show Weekends"}
           </button>
           
-          {/* Reload data button */}
+          {/* Auto-refresh toggle */}
           <button 
-            className="btn btn-outline-secondary ms-2"
-            onClick={handleReloadData}
-            title="Reload data from server"
+            className={`btn ${autoRefresh ? 'btn-primary' : 'btn-outline-primary'} ms-2`}
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
           >
-            <i className="fas fa-sync-alt me-1"></i>
-            Reload
+            <i className={`fas fa-${autoRefresh ? 'sync-alt fa-spin' : 'sync-alt'} me-1`}></i>
+            {autoRefresh ? "Auto" : "Manual"}
           </button>
+          
+          {/* Manual refresh button - only show when auto is off */}
+          {!autoRefresh && (
+            <button 
+              className="btn btn-outline-secondary ms-2"
+              onClick={handleReloadData}
+              title="Refresh data"
+            >
+              <i className="fas fa-redo-alt me-1"></i>
+              Refresh
+            </button>
+          )}
           
           {/* Back button */}
           <button 
@@ -411,6 +429,9 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
             allDaySlot={true}
             allDayText="all-day"
             weekends={showWeekends} // Control weekends visibility
+            
+            // Filter by resource if resourceId is provided in URL
+            resourceId={resourceFilter}
             
             // Add this eventDataTransform function to handle both top-level and nested properties
             eventDataTransform={(event) => {
