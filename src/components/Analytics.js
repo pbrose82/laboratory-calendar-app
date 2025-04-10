@@ -292,7 +292,6 @@ function Analytics() {
                 {equipmentUtilization.map((equipment) => (
                   <tr key={equipment.id}>
                     <td>{equipment.name}</td>
-                    <td>{equipment.count}
                     <td>{equipment.count}</td>
                     <td>
                       <div className="utilization-bar" style={{ width: '150px', display: 'inline-block', marginRight: '10px' }}>
@@ -412,4 +411,4 @@ function Analytics() {
   );
 }
 
-export default Analytics;                      
+export default Analytics;
