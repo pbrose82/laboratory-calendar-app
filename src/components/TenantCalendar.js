@@ -135,7 +135,7 @@ function TenantCalendar() {
       refreshInterval = setInterval(() => {
         console.log('Auto-refreshing calendar data...');
         handleReloadData();
-      }, 30000);
+      }, 10000);
     }
     
     // Clean up interval on component unmount
