@@ -34,6 +34,7 @@ function Analytics() {
       const tenantData = await fetchTenant(tenantId);
       
       if (tenantData && isMounted.current) {
+        console.log('Analytics - setting resources and events');
         setResources(tenantData.resources || []);
         setEvents(tenantData.events || []);
         
@@ -67,16 +68,17 @@ function Analytics() {
     return () => {
       isMounted.current = false;
     };
-  }, [tenantId, tenantName]);
+  }, [tenantId]);
   
-  // Set up automatic background refresh
+  // Set up automatic background refresh - using 30 seconds interval for consistency
   useEffect(() => {
     // Refresh data every 30 seconds
     const refreshInterval = setInterval(() => {
       if (isMounted.current) {
+        console.log('Analytics - triggering background refresh');
         loadTenantData(false);
       }
-    }, 10000);
+    }, 30000);
     
     // Clean up interval on component unmount
     return () => {
@@ -86,6 +88,10 @@ function Analytics() {
 
   // Get events within the selected time range
   const getFilteredEvents = () => {
+    if (!events || events.length === 0) {
+      return [];
+    }
+    
     const now = new Date();
     let rangeStart;
     
@@ -112,14 +118,33 @@ function Analytics() {
     }
     
     return events.filter(event => {
-      const eventDate = new Date(event.start);
-      return eventDate >= rangeStart && eventDate <= now;
+      try {
+        const eventDate = new Date(event.start);
+        return eventDate >= rangeStart && eventDate <= now;
+      } catch (e) {
+        console.error('Error parsing event date:', e, event);
+        return false;
+      }
     });
   };
 
   // Calculate equipment utilization
   const calculateEquipmentUtilization = () => {
+    if (!resources || resources.length === 0) {
+      return [];
+    }
+    
     const filteredEvents = getFilteredEvents();
+    
+    if (filteredEvents.length === 0) {
+      return resources.map(resource => ({
+        name: resource.title,
+        id: resource.id,
+        count: 0,
+        utilization: 0
+      }));
+    }
+    
     const utilization = resources.map(resource => {
       const resourceEvents = filteredEvents.filter(event => 
         event.resourceId === resource.id || 
@@ -127,10 +152,10 @@ function Analytics() {
       );
       
       return {
-        name: resource.title,
+        name: resource.title || 'Unknown Equipment',
         id: resource.id,
         count: resourceEvents.length,
-        utilization: events.length > 0 ? 
+        utilization: filteredEvents.length > 0 ? 
           Math.round((resourceEvents.length / filteredEvents.length) * 100) : 0
       };
     }).sort((a, b) => b.count - a.count);
@@ -141,6 +166,11 @@ function Analytics() {
   // Get top technicians by number of events
   const getTopTechnicians = () => {
     const filteredEvents = getFilteredEvents();
+    
+    if (filteredEvents.length === 0) {
+      return [];
+    }
+    
     const technicianCounts = {};
     
     filteredEvents.forEach(event => {
@@ -177,16 +207,22 @@ function Analytics() {
     }
     
     // Count events per month
-    events.forEach(event => {
-      const eventDate = new Date(event.start);
-      const monthIndex = months.findIndex(m => 
-        m.month === eventDate.getMonth() && m.year === eventDate.getFullYear()
-      );
-      
-      if (monthIndex >= 0) {
-        months[monthIndex].count++;
-      }
-    });
+    if (events && events.length > 0) {
+      events.forEach(event => {
+        try {
+          const eventDate = new Date(event.start);
+          const monthIndex = months.findIndex(m => 
+            m.month === eventDate.getMonth() && m.year === eventDate.getFullYear()
+          );
+          
+          if (monthIndex >= 0) {
+            months[monthIndex].count++;
+          }
+        } catch (e) {
+          console.error('Error processing event date:', e, event);
+        }
+      });
+    }
     
     return months;
   };
