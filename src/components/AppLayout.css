@@ -225,9 +225,25 @@ body {
   font-size: 14px;
 }
 
+/* Main layout structure */
+.c-sidenav {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Content sections */
+.js-views-and-assignments {
+  flex: 1;
+  overflow-y: auto;
+}
+
 /* Admin section */
+.admin-section {
+  margin-top: auto; /* Push to bottom */
+  background-color: var(--primary-color); /* Ensure background matches sidebar */
+}
+
 .admin-header {
-  margin-top: auto;
   padding: 10px 0 5px 32px;
   color: var(--text-white-opacity);
   font-size: 11px;
@@ -255,7 +271,6 @@ body {
   padding: 10px 0;
   text-align: center;
   font-size: 12px;
-  margin-top: auto; /* Ensure it stays at the bottom */
 }
 
 /* Fix copyright text in collapsed mode */
@@ -291,15 +306,8 @@ body {
   height: 32px;
 }
 
-/* Main layout structure */
-.c-sidenav {
-  display: flex;
-  flex-direction: column;
-}
-
-.js-views-and-assignments {
-  flex: 1;
-  overflow-y: auto;
+.u-width-64 {
+  width: 64px;
 }
 
 /* Main Content */
