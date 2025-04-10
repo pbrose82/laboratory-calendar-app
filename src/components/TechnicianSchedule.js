@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchTenant } from '../services/apiClient';
 import './ResourceViews.css';
@@ -12,12 +12,16 @@ function TechnicianSchedule() {
   const [tenantName, setTenantName] = useState('');
   const [technicians, setTechnicians] = useState([]);
   const [selectedTechnician, setSelectedTechnician] = useState('all');
-  const [autoRefresh, setAutoRefresh] = useState(true);
   
-  // Load tenant data function - extracted for reuse with auto-refresh
-  const loadTenantData = async () => {
+  // Ref to track if component is mounted
+  const isMounted = useRef(true);
+  
+  // Load tenant data function - handles both initial load and background refresh
+  const loadTenantData = async (isInitialLoad = false) => {
     try {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       
       // Special handling for tenant name
       if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
@@ -27,8 +31,7 @@ function TechnicianSchedule() {
       // Normal tenant handling from API
       const tenantData = await fetchTenant(tenantId);
       
-      if (tenantData) {
-        console.log('Loaded tenant data:', tenantData);
+      if (tenantData && isMounted.current) {
         const allEvents = tenantData.events || [];
         setEvents(allEvents);
         
@@ -41,7 +44,9 @@ function TechnicianSchedule() {
           )
         );
         
-        console.log('Extracted technicians from events:', uniqueTechnicians);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Extracted technicians from events:', uniqueTechnicians);
+        }
         
         // Only use default technicians if none found in events
         if (uniqueTechnicians.length === 0) {
@@ -59,41 +64,49 @@ function TechnicianSchedule() {
         if (!tenantName) {
           setTenantName(tenantData.name || tenantId);
         }
-      } else {
-        setError(`Tenant "${tenantId}" not found`);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Technician schedule data refreshed at', new Date().toLocaleTimeString());
+        }
       }
     } catch (err) {
-      console.error('Failed to load tenant data:', err);
-      setError(`Error loading tenant data: ${err.message}`);
+      if (isMounted.current) {
+        console.error('Failed to load tenant data:', err);
+        setError(`Error loading tenant data: ${err.message}`);
+      }
     } finally {
-      setLoading(false);
+      if (isInitialLoad && isMounted.current) {
+        setLoading(false);
+      }
     }
   };
   
   // Load data initially
   useEffect(() => {
     if (tenantId) {
-      loadTenantData();
-    }
-  }, [tenantId, tenantName]);
-  
-  // Auto-refresh setup
-  useEffect(() => {
-    let refreshInterval;
-    
-    if (autoRefresh) {
-      // Refresh data every 30 seconds
-      refreshInterval = setInterval(() => {
-        console.log('Auto-refreshing technician data...');
-        loadTenantData();
-      }, 30000);
+      loadTenantData(true);
     }
     
-    // Clean up interval on component unmount or when autoRefresh changes
+    // Cleanup function
     return () => {
-      if (refreshInterval) clearInterval(refreshInterval);
+      isMounted.current = false;
     };
-  }, [autoRefresh, tenantId]);
+  }, [tenantId]);
+  
+  // Set up automatic background refresh
+  useEffect(() => {
+    // Refresh data every 30 seconds
+    const refreshInterval = setInterval(() => {
+      if (isMounted.current) {
+        loadTenantData(false);
+      }
+    }, 30000);
+    
+    // Clean up interval on component unmount
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [tenantId]);
 
   // Get technician's events
   const getTechnicianEvents = (technicianName) => {
@@ -149,7 +162,11 @@ function TechnicianSchedule() {
 
   // Get initial letter of name for avatar
   const getInitial = (name) => {
-    return name ? name.charAt(0).toUpperCase() : '?';
+    // Check if name is a string and not empty before using charAt
+    if (typeof name === 'string' && name.trim().length > 0) {
+      return name.charAt(0).toUpperCase();
+    }
+    return '?';
   };
 
   // Format display name for tenant
@@ -171,30 +188,8 @@ function TechnicianSchedule() {
       <div className="content-header">
         <h1>{getDisplayName()} - Technician Schedule</h1>
         <div className="header-actions">
-          {/* Auto-refresh toggle */}
           <button 
-            className={`btn ${autoRefresh ? 'btn-primary' : 'btn-outline-primary'}`}
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
-          >
-            <i className={`fas fa-${autoRefresh ? 'sync-alt fa-spin' : 'sync-alt'} me-1`}></i>
-            {autoRefresh ? "Auto" : "Manual"}
-          </button>
-          
-          {/* Manual refresh button - only show when auto is off */}
-          {!autoRefresh && (
-            <button 
-              className="btn btn-outline-secondary ms-2"
-              onClick={loadTenantData}
-              title="Refresh data"
-            >
-              <i className="fas fa-redo-alt me-1"></i>
-              Refresh
-            </button>
-          )}
-          
-          <button 
-            className="btn btn-outline-secondary ms-2"
+            className="btn btn-outline-primary"
             onClick={() => navigate(`/${tenantId}`)}
           >
             <i className="fas fa-calendar-alt me-1"></i>
