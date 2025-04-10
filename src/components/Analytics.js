@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchTenant } from '../services/apiClient';
 import './ResourceViews.css';
@@ -15,42 +15,74 @@ function Analytics() {
   // Time range for analytics (default: last 30 days)
   const [timeRange, setTimeRange] = useState('30days');
   
-  useEffect(() => {
-    async function loadTenantData() {
-      try {
+  // Ref to track if component is mounted
+  const isMounted = useRef(true);
+
+  // Function to load tenant data - handles both initial load and background refresh
+  const loadTenantData = async (isInitialLoad = false) => {
+    try {
+      if (isInitialLoad) {
         setLoading(true);
+      }
+      
+      // Special handling for tenant name
+      if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
+        setTenantName('Product CASE UAT');
+      }
+      
+      // Normal tenant handling from API
+      const tenantData = await fetchTenant(tenantId);
+      
+      if (tenantData && isMounted.current) {
+        setResources(tenantData.resources || []);
+        setEvents(tenantData.events || []);
         
-        // Special handling for tenant name
-        if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
-          setTenantName('Product CASE UAT');
+        if (!tenantName) {
+          setTenantName(tenantData.name || tenantId);
         }
         
-        // Normal tenant handling from API
-        const tenantData = await fetchTenant(tenantId);
-        
-        if (tenantData) {
-          console.log('Loaded tenant data:', tenantData);
-          setResources(tenantData.resources || []);
-          setEvents(tenantData.events || []);
-          
-          if (!tenantName) {
-            setTenantName(tenantData.name || tenantId);
-          }
-        } else {
-          setError(`Tenant "${tenantId}" not found`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Analytics data refreshed at', new Date().toLocaleTimeString());
         }
-      } catch (err) {
+      }
+    } catch (err) {
+      if (isMounted.current) {
         console.error('Failed to load tenant data:', err);
         setError(`Error loading tenant data: ${err.message}`);
-      } finally {
+      }
+    } finally {
+      if (isInitialLoad && isMounted.current) {
         setLoading(false);
       }
     }
+  };
 
+  // Initial data load
+  useEffect(() => {
     if (tenantId) {
-      loadTenantData();
+      loadTenantData(true);
     }
+    
+    // Cleanup function
+    return () => {
+      isMounted.current = false;
+    };
   }, [tenantId, tenantName]);
+  
+  // Set up automatic background refresh
+  useEffect(() => {
+    // Refresh data every 30 seconds
+    const refreshInterval = setInterval(() => {
+      if (isMounted.current) {
+        loadTenantData(false);
+      }
+    }, 10000);
+    
+    // Clean up interval on component unmount
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [tenantId]);
 
   // Get events within the selected time range
   const getFilteredEvents = () => {
@@ -213,7 +245,7 @@ function Analytics() {
         <h1>{getDisplayName()} - Analytics & Reports</h1>
         <div className="header-actions">
           <button 
-            className="btn btn-outline-secondary"
+            className="btn btn-outline-primary"
             onClick={() => navigate(`/${tenantId}`)}
           >
             <i className="fas fa-calendar-alt me-1"></i>
@@ -362,7 +394,7 @@ function Analytics() {
                           className="utilization-fill" 
                           style={{ 
                             width: `${Math.min(month.count * 5, 100)}%`,
-                            backgroundColor: month.count > 0 ? '#0047BB' : '#e9ecef'
+                            backgroundColor: month.count > 0 ? '#2196F3' : '#e9ecef'
                           }}
                         ></div>
                       </div>
