@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchTenant } from '../services/apiClient';
 import './ResourceViews.css';
@@ -11,9 +11,17 @@ function GanttChart() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tenantName, setTenantName] = useState('');
-  const [timeRange, setTimeRange] = useState('week'); // week, 2week, month
+  const [viewType, setViewType] = useState('week'); // 'day' or 'week'
   const [startDate, setStartDate] = useState(getDefaultStartDate());
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [showWeekends, setShowWeekends] = useState(true);
+  const [selectedResource, setSelectedResource] = useState('all');
+  const [searchText, setSearchText] = useState('');
+  
+  // Reference to track if component is mounted
+  const isMounted = useRef(true);
+  
+  // Track last refresh time for display purposes
+  const [lastRefreshTime, setLastRefreshTime] = useState(null);
 
   // Get default start date (beginning of current week)
   function getDefaultStartDate() {
@@ -23,10 +31,12 @@ function GanttChart() {
     return date;
   }
 
-  // Function to load tenant data - extracted for reuse with auto-refresh
-  const loadTenantData = async () => {
+  // Function to load tenant data - background refresh
+  const loadTenantData = async (isInitialLoad = false) => {
     try {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       
       // Special handling for tenant name
       if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
@@ -36,8 +46,8 @@ function GanttChart() {
       // Normal tenant handling from API
       const tenantData = await fetchTenant(tenantId);
       
-      if (tenantData) {
-        console.log('Loaded tenant data:', tenantData);
+      if (tenantData && isMounted.current) {
+        // Only update state if component is still mounted
         setResources(tenantData.resources || []);
         setEvents(tenantData.events || []);
         
@@ -45,67 +55,112 @@ function GanttChart() {
           setTenantName(tenantData.name || tenantId);
         }
         
-        console.log('Gantt chart data refreshed at', new Date().toLocaleTimeString());
-      } else {
-        setError(`Tenant "${tenantId}" not found`);
+        // Update last refresh time
+        setLastRefreshTime(new Date());
+        
+        // Log refresh without cluttering console too much
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Data refreshed at', new Date().toLocaleTimeString());
+        }
       }
     } catch (err) {
-      console.error('Failed to load tenant data:', err);
-      setError(`Error loading tenant data: ${err.message}`);
+      if (isMounted.current) {
+        console.error('Failed to load tenant data:', err);
+        setError(`Error loading tenant data: ${err.message}`);
+      }
     } finally {
-      setLoading(false);
+      if (isInitialLoad && isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
   // Initial data load
   useEffect(() => {
     if (tenantId) {
-      loadTenantData();
+      loadTenantData(true);
     }
-  }, [tenantId, tenantName]);
-  
-  // Auto-refresh setup
-  useEffect(() => {
-    let refreshInterval;
     
-    if (autoRefresh) {
-      // Refresh data every 30 seconds
-      refreshInterval = setInterval(() => {
-        console.log('Auto-refreshing gantt chart data...');
-        loadTenantData();
-      }, 30000);
-    }
+    // Cleanup function to set mounted state to false when unmounting
+    return () => {
+      isMounted.current = false;
+    };
+  }, [tenantId]);
+  
+  // Set up automatic background refresh
+  useEffect(() => {
+    // Refresh data every 30 seconds in the background
+    const refreshInterval = setInterval(() => {
+      if (isMounted.current) {
+        loadTenantData(false);
+      }
+    }, 30000);
     
     // Clean up interval on component unmount
     return () => {
-      if (refreshInterval) clearInterval(refreshInterval);
+      clearInterval(refreshInterval);
     };
-  }, [autoRefresh, tenantId]);
+  }, [tenantId]);
+
+  // Filter resources based on selection
+  const getFilteredResources = () => {
+    if (selectedResource === 'all') {
+      return resources;
+    }
+    return resources.filter(r => r.id === selectedResource);
+  };
+
+  // Filter events based on search and resource
+  const getFilteredEvents = () => {
+    return events.filter(event => {
+      // Filter by resource
+      const matchesResource = selectedResource === 'all' || 
+                             event.resourceId === selectedResource ||
+                             event.equipment === resources.find(r => r.id === selectedResource)?.title;
+      
+      // Filter by search text
+      const matchesSearch = !searchText || 
+                           (event.title && event.title.toLowerCase().includes(searchText.toLowerCase())) ||
+                           (event.technician && event.technician.toLowerCase().includes(searchText.toLowerCase())) ||
+                           (event.equipment && event.equipment.toLowerCase().includes(searchText.toLowerCase())) ||
+                           (event.notes && event.notes.toLowerCase().includes(searchText.toLowerCase()));
+      
+      return matchesResource && matchesSearch;
+    });
+  };
 
   // Calculate days array for the gantt chart
   const getDays = () => {
     const days = [];
-    const endDate = new Date(startDate);
-    
-    switch (timeRange) {
-      case 'week':
-        endDate.setDate(startDate.getDate() + 7);
-        break;
-      case '2week':
-        endDate.setDate(startDate.getDate() + 14);
-        break;
-      case 'month':
-        endDate.setMonth(startDate.getMonth() + 1);
-        break;
-      default:
-        endDate.setDate(startDate.getDate() + 7);
-    }
-    
     let currentDate = new Date(startDate);
     
-    while (currentDate < endDate) {
-      days.push(new Date(currentDate));
-      currentDate.setDate(currentDate.getDate() + 1);
+    if (viewType === 'day') {
+      // For day view, return hours
+      for (let hour = 6; hour < 20; hour++) { // 6 AM to 8 PM
+        const hourDate = new Date(currentDate);
+        hourDate.setHours(hour, 0, 0, 0);
+        days.push({
+          date: hourDate,
+          label: `${hour % 12 === 0 ? 12 : hour % 12}${hour < 12 ? 'am' : 'pm'}`
+        });
+      }
+    } else {
+      // For week view, return days
+      let endDate;
+      if (viewType === 'week') {
+        endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 7);
+      }
+      
+      while (currentDate < endDate) {
+        if (showWeekends || (currentDate.getDay() !== 0 && currentDate.getDay() !== 6)) {
+          days.push({
+            date: new Date(currentDate),
+            label: formatDate(currentDate)
+          });
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
     }
     
     return days;
@@ -113,68 +168,138 @@ function GanttChart() {
 
   // Format date for display
   const formatDate = (date) => {
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric'
-    }).format(date);
+    const dayName = new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(date);
+    const monthDay = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
+    return `${dayName} ${monthDay}`;
   };
 
-  // Get short day name
-  const getDayName = (date) => {
-    return new Intl.DateTimeFormat('en-US', {
-      weekday: 'short'
-    }).format(date);
-  };
-
-  // Get resource events for the gantt chart
-  const getResourceEvents = (resourceId) => {
-    return events.filter(event => {
-      // Match by resourceId or equipment name
-      const matchesResource = event.resourceId === resourceId || 
-                              event.equipment === resources.find(r => r.id === resourceId)?.title;
+  // Get display position of an event
+  const getEventPosition = (event, days) => {
+    if (!event.start || !event.end) return null;
+    
+    let eventStart = new Date(event.start);
+    let eventEnd = new Date(event.end);
+    
+    if (viewType === 'day') {
+      // Only show events for the selected day
+      if (eventStart.getDate() !== startDate.getDate() || 
+          eventStart.getMonth() !== startDate.getMonth() || 
+          eventStart.getFullYear() !== startDate.getFullYear()) {
+        return null;
+      }
       
-      // Check if event falls within the displayed range
-      const eventStart = new Date(event.start);
-      const eventEnd = new Date(event.end);
-      const rangeEnd = getDays()[getDays().length - 1];
+      const dayStart = 6; // 6am
+      const dayEnd = 20; // 8pm
+      const totalHours = dayEnd - dayStart;
       
-      return matchesResource && eventEnd >= startDate && eventStart <= rangeEnd;
-    });
+      // Get hour with decimal for minutes
+      const startHour = eventStart.getHours() + (eventStart.getMinutes() / 60);
+      const endHour = eventEnd.getHours() + (eventEnd.getMinutes() / 60);
+      
+      // If event is outside visible hours, adjust or skip
+      if (endHour <= dayStart || startHour >= dayEnd) return null;
+      
+      const adjustedStart = Math.max(startHour, dayStart);
+      const adjustedEnd = Math.min(endHour, dayEnd);
+      
+      const left = ((adjustedStart - dayStart) / totalHours) * 100;
+      const width = ((adjustedEnd - adjustedStart) / totalHours) * 100;
+      
+      return {
+        left: `${left}%`,
+        width: `${Math.max(width, 2)}%` // Ensure minimum width for visibility
+      };
+    } else {
+      // Week view
+      const firstDay = days[0].date;
+      const lastDay = days[days.length - 1].date;
+      lastDay.setHours(23, 59, 59, 999); // End of the last day
+      
+      // Skip events outside the range
+      if (eventEnd < firstDay || eventStart > lastDay) return null;
+      
+      // Adjust events that extend beyond the range
+      if (eventStart < firstDay) eventStart = new Date(firstDay);
+      if (eventEnd > lastDay) eventEnd = new Date(lastDay);
+      
+      // Calculate position as percentage of total range
+      const totalRange = lastDay - firstDay;
+      const eventStartOffset = eventStart - firstDay;
+      const eventDuration = eventEnd - eventStart;
+      
+      const left = (eventStartOffset / totalRange) * 100;
+      const width = (eventDuration / totalRange) * 100;
+      
+      return {
+        left: `${left}%`,
+        width: `${Math.max(width, 0.5)}%` // Ensure minimum width for visibility
+      };
+    }
   };
 
-  // Calculate position and width of event bars
-  const getEventBarStyle = (event) => {
-    const days = getDays();
-    const totalDays = days.length;
-    const dayWidth = 100 / totalDays; // percentage width of each day
+  // Move time range (previous/next)
+  const moveTimeRange = (direction) => {
+    const newStartDate = new Date(startDate);
     
-    const eventStart = new Date(event.start);
-    const eventEnd = new Date(event.end);
+    if (direction === 'prev') {
+      if (viewType === 'day') {
+        newStartDate.setDate(newStartDate.getDate() - 1);
+      } else if (viewType === 'week') {
+        newStartDate.setDate(newStartDate.getDate() - 7);
+      }
+    } else {
+      if (viewType === 'day') {
+        newStartDate.setDate(newStartDate.getDate() + 1);
+      } else if (viewType === 'week') {
+        newStartDate.setDate(newStartDate.getDate() + 7);
+      }
+    }
     
-    // Clamp event start/end to visible range
-    const visibleStart = eventStart < startDate ? startDate : eventStart;
-    const visibleEnd = eventEnd > days[days.length - 1] ? days[days.length - 1] : eventEnd;
-    
-    // Calculate how many days from start of range
-    const daysFromStart = Math.floor((visibleStart - startDate) / (24 * 60 * 60 * 1000));
-    
-    // Calculate duration in days (or partial days)
-    const durationInMs = visibleEnd - visibleStart;
-    const durationInDays = durationInMs / (24 * 60 * 60 * 1000);
-    
-    // Calculate position and width
-    const left = daysFromStart * dayWidth;
-    const width = Math.max(durationInDays * dayWidth, dayWidth / 4); // Ensure minimum width
-    
-    return {
-      left: `${left}%`,
-      width: `${width}%`
-    };
+    setStartDate(newStartDate);
   };
 
-  // Handle navigation to equipment calendar
-  const handleViewEquipmentCalendar = (resourceId) => {
-    navigate(`/${tenantId}?resourceId=${resourceId}`);
+  // Reset to today
+  const goToToday = () => {
+    if (viewType === 'day') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      setStartDate(today);
+    } else {
+      setStartDate(getDefaultStartDate());
+    }
+  };
+
+  // Get formatted title for the current view
+  const getViewTitle = () => {
+    if (viewType === 'day') {
+      return new Intl.DateTimeFormat('en-US', { 
+        weekday: 'long',
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }).format(startDate);
+    } else if (viewType === 'week') {
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      
+      const startMonth = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(startDate);
+      const endMonth = new Intl.DateTimeFormat('en-US', { month: 'short' }).format(endDate);
+      
+      return `${startMonth} ${startDate.getDate()} - ${endMonth} ${endDate.getDate()}, ${startDate.getFullYear()}`;
+    }
+  };
+
+  // Get event tooltip content
+  const getEventTooltip = (event) => {
+    const start = new Date(event.start);
+    const end = new Date(event.end);
+    
+    return `${event.title}
+Start: ${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+End: ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+${event.technician ? `Technician: ${event.technician}` : ''}
+${event.sampleType ? `Sample Type: ${event.sampleType}` : ''}
+${event.notes ? `Notes: ${event.notes}` : ''}`;
   };
 
   // Format display name for tenant
@@ -188,70 +313,31 @@ function GanttChart() {
     }
   };
 
-  // Move time range (previous/next)
-  const moveTimeRange = (direction) => {
-    const newStartDate = new Date(startDate);
-    
-    if (direction === 'prev') {
-      switch (timeRange) {
-        case 'week':
-          newStartDate.setDate(newStartDate.getDate() - 7);
-          break;
-        case '2week':
-          newStartDate.setDate(newStartDate.getDate() - 14);
-          break;
-        case 'month':
-          newStartDate.setMonth(newStartDate.getMonth() - 1);
-          break;
-        default:
-          newStartDate.setDate(newStartDate.getDate() - 7);
-      }
+  // Handle view change
+  const handleViewChange = (newView) => {
+    setViewType(newView);
+    // Reset start date to today when changing views
+    if (newView === 'day') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      setStartDate(today);
     } else {
-      switch (timeRange) {
-        case 'week':
-          newStartDate.setDate(newStartDate.getDate() + 7);
-          break;
-        case '2week':
-          newStartDate.setDate(newStartDate.getDate() + 14);
-          break;
-        case 'month':
-          newStartDate.setMonth(newStartDate.getMonth() + 1);
-          break;
-        default:
-          newStartDate.setDate(newStartDate.getDate() + 7);
-      }
+      setStartDate(getDefaultStartDate());
     }
-    
-    setStartDate(newStartDate);
   };
+
+  // Get the days/hours for the current view
+  const days = getDays();
+  
+  // Get filtered resources and events
+  const filteredResources = getFilteredResources();
+  const filteredEvents = getFilteredEvents();
 
   return (
     <div className="dashboard-container">
       <div className="content-header">
         <h1>{getDisplayName()} - Gantt Chart</h1>
         <div className="header-actions">
-          {/* Auto-refresh toggle */}
-          <button 
-            className={`btn ${autoRefresh ? 'btn-primary' : 'btn-outline-primary'}`}
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
-          >
-            <i className={`fas fa-${autoRefresh ? 'sync-alt fa-spin' : 'sync-alt'} me-1`}></i>
-            {autoRefresh ? "Auto" : "Manual"}
-          </button>
-          
-          {/* Manual refresh button - only show when auto is off */}
-          {!autoRefresh && (
-            <button 
-              className="btn btn-outline-secondary ms-2"
-              onClick={loadTenantData}
-              title="Refresh data"
-            >
-              <i className="fas fa-redo-alt me-1"></i>
-              Refresh
-            </button>
-          )}
-          
           <button 
             className="btn btn-outline-secondary ms-2"
             onClick={() => navigate(`/${tenantId}`)}
@@ -287,12 +373,11 @@ function GanttChart() {
               
               <select 
                 className="filter-select me-2"
-                value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value)}
+                value={viewType}
+                onChange={(e) => handleViewChange(e.target.value)}
               >
-                <option value="week">1 Week</option>
-                <option value="2week">2 Weeks</option>
-                <option value="month">1 Month</option>
+                <option value="day">Day</option>
+                <option value="week">Week</option>
               </select>
               
               <button 
@@ -304,28 +389,74 @@ function GanttChart() {
               
               <button 
                 className="btn btn-outline-secondary"
-                onClick={() => setStartDate(getDefaultStartDate())}
+                onClick={goToToday}
               >
                 Today
               </button>
+              
+              <span className="mx-4 font-semibold">{getViewTitle()}</span>
+            </div>
+            
+            <div className="filter-controls">
+              {/* Resource filter */}
+              <select 
+                className="filter-select me-2"
+                value={selectedResource}
+                onChange={(e) => setSelectedResource(e.target.value)}
+              >
+                <option value="all">All Equipment</option>
+                {resources.map((resource) => (
+                  <option key={resource.id} value={resource.id}>
+                    {resource.title || resource.name}
+                  </option>
+                ))}
+              </select>
+              
+              {/* Search input */}
+              <div className="search-input">
+                <input 
+                  type="text"
+                  placeholder="Search events..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  className="filter-input"
+                />
+                <i className="fas fa-search search-icon"></i>
+              </div>
+              
+              {/* Weekend toggle for week view */}
+              {viewType === 'week' && (
+                <button 
+                  className={`btn ${showWeekends ? 'btn-primary' : 'btn-outline-primary'} ms-2`}
+                  onClick={() => setShowWeekends(!showWeekends)}
+                >
+                  <i className="fas fa-calendar-week me-1"></i>
+                  {showWeekends ? "Hide Weekends" : "Show Weekends"}
+                </button>
+              )}
             </div>
           </div>
           
-          {resources.length === 0 ? (
+          {filteredResources.length === 0 ? (
             <div className="text-center py-4 mt-4">
               <i className="fas fa-microscope fa-3x mb-3 text-muted"></i>
               <p>No equipment found. Equipment will appear here when added to calendar events.</p>
             </div>
           ) : (
             <div className="gantt-container">
-              {/* Day headers */}
-              <div className="gantt-row">
+              {/* Header row with day/hour columns */}
+              <div className="gantt-row gantt-header-row">
                 <div className="gantt-label"></div>
                 <div className="gantt-timeline">
                   <div className="gantt-days">
-                    {getDays().map((day, index) => (
-                      <div className="gantt-day" key={index}>
-                        {getDayName(day)} {formatDate(day)}
+                    {days.map((day, index) => (
+                      <div 
+                        className={`gantt-day ${
+                          new Date().toDateString() === day.date.toDateString() ? 'today' : ''
+                        }`} 
+                        key={index}
+                      >
+                        {day.label}
                       </div>
                     ))}
                   </div>
@@ -333,29 +464,65 @@ function GanttChart() {
               </div>
               
               {/* Resource rows */}
-              {resources.map(resource => (
+              {filteredResources.map(resource => (
                 <div className="gantt-row" key={resource.id}>
-                  <div className="gantt-label" onClick={() => handleViewEquipmentCalendar(resource.id)}>
-                    {resource.title}
+                  <div 
+                    className="gantt-label" 
+                    onClick={() => navigate(`/${tenantId}?resourceId=${resource.id}`)}
+                    title="Click to view calendar for this equipment"
+                  >
+                    {resource.title || resource.name}
                   </div>
                   <div className="gantt-timeline">
                     <div className="gantt-days">
-                      {getDays().map((day, index) => (
+                      {days.map((day, index) => (
                         <div className="gantt-day" key={index}></div>
                       ))}
                     </div>
                     
-                    {/* Event bars */}
-                    {getResourceEvents(resource.id).map((event, eventIndex) => (
+                    {/* Current time indicator for day view */}
+                    {viewType === 'day' && 
+                      new Date().toDateString() === startDate.toDateString() && (
                       <div 
-                        className="gantt-bar"
-                        key={eventIndex}
-                        style={getEventBarStyle(event)}
-                        title={`${event.title}\n${new Date(event.start).toLocaleString()} - ${new Date(event.end).toLocaleString()}`}
-                      >
-                        {event.title}
-                      </div>
-                    ))}
+                        className="current-time-indicator" 
+                        style={{
+                          left: `${((new Date().getHours() + (new Date().getMinutes() / 60) - 6) / 14) * 100}%`
+                        }}
+                      ></div>
+                    )}
+                    
+                    {/* Event bars */}
+                    {filteredEvents
+                      .filter(event => 
+                        event.resourceId === resource.id || 
+                        event.equipment === resource.title
+                      )
+                      .map((event, eventIndex) => {
+                        const position = getEventPosition(event, days);
+                        if (!position) return null;
+                        
+                        // Extract ER number if present
+                        const erMatch = event.title.match(/ER\d+/);
+                        const shortTitle = erMatch ? erMatch[0] : 
+                                         event.title.length > 10 ? 
+                                         `${event.title.substring(0, 10)}...` : 
+                                         event.title;
+                        
+                        return (
+                          <div 
+                            className="gantt-bar"
+                            key={eventIndex}
+                            style={position}
+                            title={getEventTooltip(event)}
+                            onClick={() => {
+                              // Show detailed event info
+                              alert(getEventTooltip(event));
+                            }}
+                          >
+                            {shortTitle}
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>
               ))}
@@ -364,8 +531,12 @@ function GanttChart() {
           
           <div className="gantt-legend">
             <div className="legend-item">
-              <div className="legend-color" style={{ backgroundColor: '#0047BB' }}></div>
+              <div className="legend-color"></div>
               <div className="legend-label">Equipment Reservation</div>
+            </div>
+            
+            <div className="event-count">
+              {filteredEvents.length} events • {filteredResources.length} equipment
             </div>
           </div>
         </div>
