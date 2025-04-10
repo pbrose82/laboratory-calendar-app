@@ -107,15 +107,6 @@ function AppLayout({ children }) {
                 </div>
                 {isExpanded && <span className="t-4">Alchemy Dashboard</span>}
               </a>
-
-              <Link to="/"
-                    className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${location.pathname === '/' ? 'c-selectable-item__dark--active' : ''}`}
-                    title={isExpanded ? null : 'Calendar Home'}>
-                <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
-                  <i className="fas fa-home u-color-white-opacity-72"></i>
-                </div>
-                {isExpanded && <span className="t-4">Calendar Home</span>}
-              </Link>
               
               {/* Only show tenant-specific menu items if a tenant is selected */}
               {tenantId && (
