@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -54,16 +54,20 @@ function TenantCalendar() {
   const [tenantName, setTenantName] = useState('');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [showWeekends, setShowWeekends] = useState(true);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  
+  // Reference to track if component is mounted
+  const isMounted = useRef(true);
   
   // Get resource filter from URL query params if present
   const searchParams = new URLSearchParams(location.search);
   const resourceFilter = searchParams.get('resourceId');
 
-  // Function to load tenant data - extracted for reuse with auto-refresh
-  const handleReloadData = async () => {
+  // Function to load tenant data - now handles both initial load and background refresh
+  const handleReloadData = async (isInitialLoad = false) => {
     try {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       
       // Special handling for demo tenant
       if (tenantId === 'demo-tenant') {
@@ -78,7 +82,9 @@ function TenantCalendar() {
         }
         setResources(demoTenantResources);
         setTenantName('Demo Tenant');
-        setLoading(false);
+        if (isInitialLoad) {
+          setLoading(false);
+        }
         return;
       }
       
@@ -90,12 +96,9 @@ function TenantCalendar() {
       // Normal tenant handling from API
       const tenantData = await fetchTenant(tenantId);
       
-      if (tenantData) {
-        console.log('Loaded tenant data:', tenantData);
-        
+      if (tenantData && isMounted.current) {
         // Process events to ensure ISO date format
         const formattedEvents = ensureISODateFormat(tenantData.events || []);
-        console.log('Events after date format validation:', formattedEvents);
         setEvents(formattedEvents);
         
         setResources(tenantData.resources || []);
@@ -103,15 +106,19 @@ function TenantCalendar() {
           setTenantName(tenantData.name || tenantId);
         }
         
-        console.log('Calendar data refreshed at', new Date().toLocaleTimeString());
-      } else {
-        setError(`Tenant "${tenantId}" not found`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Calendar data refreshed at', new Date().toLocaleTimeString());
+        }
       }
     } catch (err) {
-      console.error('Failed to load tenant data:', err);
-      setError(`Error loading tenant data: ${err.message}`);
+      if (isMounted.current) {
+        console.error('Failed to load tenant data:', err);
+        setError(`Error loading tenant data: ${err.message}`);
+      }
     } finally {
-      setLoading(false);
+      if (isInitialLoad && isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -122,27 +129,29 @@ function TenantCalendar() {
     setIsAdminAuthenticated(adminAuth === 'true');
     
     if (tenantId) {
-      handleReloadData();
+      handleReloadData(true);
     }
-  }, [tenantId, tenantName]);
-  
-  // Set up auto-refresh
-  useEffect(() => {
-    let refreshInterval;
     
-    if (autoRefresh) {
-      // Refresh data every 30 seconds
-      refreshInterval = setInterval(() => {
-        console.log('Auto-refreshing calendar data...');
-        handleReloadData();
-      }, 10000);
-    }
+    // Cleanup function
+    return () => {
+      isMounted.current = false;
+    };
+  }, [tenantId]);
+  
+  // Set up automatic background refresh
+  useEffect(() => {
+    // Refresh data every 30 seconds
+    const refreshInterval = setInterval(() => {
+      if (isMounted.current) {
+        handleReloadData(false);
+      }
+    }, 30000);
     
     // Clean up interval on component unmount
     return () => {
-      if (refreshInterval) clearInterval(refreshInterval);
+      clearInterval(refreshInterval);
     };
-  }, [autoRefresh]);
+  }, [tenantId]);
 
   const handleDateSelect = async (selectInfo) => {
     const title = prompt('Please enter a new event title:');
@@ -345,28 +354,6 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
             <i className="fas fa-calendar-week me-1"></i>
             {showWeekends ? "Hide Weekends" : "Show Weekends"}
           </button>
-          
-          {/* Auto-refresh toggle */}
-          <button 
-            className={`btn ${autoRefresh ? 'btn-primary' : 'btn-outline-primary'} ms-2`}
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
-          >
-            <i className={`fas fa-${autoRefresh ? 'sync-alt fa-spin' : 'sync-alt'} me-1`}></i>
-            {autoRefresh ? "Auto" : "Manual"}
-          </button>
-          
-          {/* Manual refresh button - only show when auto is off */}
-          {!autoRefresh && (
-            <button 
-              className="btn btn-outline-secondary ms-2"
-              onClick={handleReloadData}
-              title="Refresh data"
-            >
-              <i className="fas fa-redo-alt me-1"></i>
-              Refresh
-            </button>
-          )}
           
           {/* Back button */}
           <button 
