@@ -272,11 +272,7 @@ if (eventData.equipment && !tenants[tenantId].resources.some(r => r.title === ev
             name: tenantId,
             createdAt: new Date().toISOString(),
             events: [],
-            resources: [
-              { id: 'equipment-1', title: 'HPLC Machine' },
-              { id: 'equipment-2', title: 'Mass Spectrometer' },
-              { id: 'equipment-3', title: 'GCMS Machine' }
-            ]
+            resources: []
           };
         }
         
@@ -351,11 +347,7 @@ if (eventData.equipment && !tenants[tenantId].resources.some(r => r.title === ev
           name: tenantId,
           createdAt: new Date().toISOString(),
           events: [],
-          resources: [
-            { id: 'equipment-1', title: 'HPLC Machine' },
-            { id: 'equipment-2', title: 'Mass Spectrometer' },
-            { id: 'equipment-3', title: 'GCMS Machine' }
-          ]
+          resources: []
         };
       }
       
@@ -420,11 +412,7 @@ if (eventData.equipment && !tenants[tenantId].resources.some(r => r.title === ev
           name: tenantId,
           createdAt: new Date().toISOString(),
           events: [],
-          resources: [
-            { id: 'equipment-1', title: 'HPLC Machine' },
-            { id: 'equipment-2', title: 'Mass Spectrometer' },
-            { id: 'equipment-3', title: 'GCMS Machine' }
-          ]
+          resources: []
         };
       }
       
@@ -652,6 +640,43 @@ if (eventData.equipment && !tenants[tenantId].resources.some(r => r.title === ev
   }
 });
 
+// Add this to your server.js file
+app.delete('/api/equipment/:equipmentId', (req, res) => {
+  try {
+    const { equipmentId } = req.params;
+    const { tenantId } = req.query;
+    
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID is required' });
+    }
+    
+    if (!tenants[tenantId]) {
+      return res.status(404).json({ error: `Tenant "${tenantId}" not found` });
+    }
+    
+    // Find the equipment index
+    const resourceIndex = tenants[tenantId].resources.findIndex(r => r.id === equipmentId);
+    
+    if (resourceIndex === -1) {
+      return res.status(404).json({ error: `Equipment "${equipmentId}" not found for tenant "${tenantId}"` });
+    }
+    
+    // Remove the equipment
+    tenants[tenantId].resources.splice(resourceIndex, 1);
+    
+    // Save tenant data after modification
+    saveTenantData();
+    
+    return res.json({ 
+      success: true, 
+      message: `Equipment "${equipmentId}" removed successfully`
+    });
+  } catch (error) {
+    console.error('Error removing equipment:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 /**
  * API endpoint to register a new tenant
  */
@@ -672,11 +697,7 @@ app.post('/api/tenants', (req, res) => {
       name: tenantName,
       createdAt: new Date().toISOString(),
       events: [],
-      resources: [
-        { id: 'equipment-1', title: 'HPLC Machine' },
-        { id: 'equipment-2', title: 'Mass Spectrometer' },
-        { id: 'equipment-3', title: 'GCMS Machine' }
-      ]
+      resources: []
     };
     
     // Save tenant data after creating a new tenant
