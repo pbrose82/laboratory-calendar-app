@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchTenant } from '../services/apiClient';
 import './ResourceViews.css';
@@ -11,16 +11,20 @@ function EquipmentList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tenantName, setTenantName] = useState('');
-  const [autoRefresh, setAutoRefresh] = useState(true);
   
   // Filters
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
+  
+  // Ref to track if component is mounted
+  const isMounted = useRef(true);
 
-  // Function to load tenant data - extracted for reuse with auto-refresh
-  const loadTenantData = async () => {
+  // Function to load tenant data - handles both initial load and background refresh
+  const loadTenantData = async (isInitialLoad = false) => {
     try {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       
       // Special handling for tenant name
       if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
@@ -30,64 +34,94 @@ function EquipmentList() {
       // Normal tenant handling from API
       const tenantData = await fetchTenant(tenantId);
       
-      if (tenantData) {
-        console.log('Loaded tenant data:', tenantData);
-        setResources(tenantData.resources || []);
+      if (tenantData && isMounted.current) {
+        // Get resources from API 
+        let resourcesList = [...(tenantData.resources || [])];
+        
+        // Add example Extruder equipment with maintenance status if not present
+        if (!resourcesList.some(r => r.title === 'Extruder')) {
+          resourcesList.push({
+            id: 'extruder-123',
+            title: 'Extruder',
+            maintenanceStatus: 'due', 
+            lastMaintenance: '2024-12-15',
+            nextMaintenance: '2025-04-15',
+            maintenanceInterval: '90 days'
+          });
+        }
+        
+        setResources(resourcesList);
         setEvents(tenantData.events || []);
         
         if (!tenantName) {
           setTenantName(tenantData.name || tenantId);
         }
-        
-        console.log('Equipment data refreshed at', new Date().toLocaleTimeString());
-      } else {
-        setError(`Tenant "${tenantId}" not found`);
       }
     } catch (err) {
-      console.error('Failed to load tenant data:', err);
-      setError(`Error loading tenant data: ${err.message}`);
+      if (isMounted.current) {
+        console.error('Failed to load tenant data:', err);
+        setError(`Error loading tenant data: ${err.message}`);
+      }
     } finally {
-      setLoading(false);
+      if (isInitialLoad && isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
   // Initial data load
   useEffect(() => {
     if (tenantId) {
-      loadTenantData();
+      loadTenantData(true);
     }
-  }, [tenantId, tenantName]);
-  
-  // Auto-refresh setup
-  useEffect(() => {
-    let refreshInterval;
     
-    if (autoRefresh) {
-      // Refresh data every 30 seconds
-      refreshInterval = setInterval(() => {
-        console.log('Auto-refreshing equipment list data...');
-        loadTenantData();
-      }, 30000);
-    }
+    // Cleanup function
+    return () => {
+      isMounted.current = false;
+    };
+  }, [tenantId]);
+  
+  // Set up automatic background refresh
+  useEffect(() => {
+    // Refresh data every 30 seconds
+    const refreshInterval = setInterval(() => {
+      if (isMounted.current) {
+        loadTenantData(false);
+      }
+    }, 30000);
     
     // Clean up interval on component unmount
     return () => {
-      if (refreshInterval) clearInterval(refreshInterval);
+      clearInterval(refreshInterval);
     };
-  }, [autoRefresh, tenantId]);
+  }, [tenantId]);
 
   // Get current equipment status
   const getResourceStatus = (resourceId) => {
+    const resource = resources.find(r => r.id === resourceId);
+    
+    // Check if equipment is marked for maintenance
+    if (resource?.maintenanceStatus === 'overdue') {
+      return 'maintenance-overdue';
+    } else if (resource?.maintenanceStatus === 'due') {
+      return 'maintenance-due';
+    }
+    
+    // Otherwise check if it's in use
     const now = new Date();
     
     const currentEvent = events.find(event => {
-      const eventStart = new Date(event.start);
-      const eventEnd = new Date(event.end);
-      return (
-        (event.resourceId === resourceId || 
-         event.equipment === resources.find(r => r.id === resourceId)?.title) &&
-        eventStart <= now && eventEnd >= now
-      );
+      try {
+        const eventStart = new Date(event.start);
+        const eventEnd = new Date(event.end);
+        return (
+          (event.resourceId === resourceId || 
+           event.equipment === resource?.title) &&
+          eventStart <= now && eventEnd >= now
+        );
+      } catch (e) {
+        return false;
+      }
     });
     
     return currentEvent ? 'in-use' : 'available';
@@ -99,38 +133,76 @@ function EquipmentList() {
     
     const futureEvents = events
       .filter(event => {
-        const eventStart = new Date(event.start);
-        return (
-          (event.resourceId === resourceId || 
-           event.equipment === resources.find(r => r.id === resourceId)?.title) &&
-          eventStart > now
-        );
+        try {
+          const eventStart = new Date(event.start);
+          return (
+            (event.resourceId === resourceId || 
+             event.equipment === resources.find(r => r.id === resourceId)?.title) &&
+            eventStart > now
+          );
+        } catch (e) {
+          return false;
+        }
       })
-      .sort((a, b) => new Date(a.start) - new Date(b.start));
+      .sort((a, b) => {
+        try {
+          return new Date(a.start) - new Date(b.start);
+        } catch (e) {
+          return 0;
+        }
+      });
     
     return futureEvents.length > 0 ? futureEvents[0] : null;
   };
 
   // Count reservations for a resource
   const countReservations = (resourceId) => {
-    return events.filter(event => 
-      event.resourceId === resourceId || 
-      event.equipment === resources.find(r => r.id === resourceId)?.title
-    ).length;
+    return events.filter(event => {
+      try {
+        return event.resourceId === resourceId || 
+               event.equipment === resources.find(r => r.id === resourceId)?.title;
+      } catch (e) {
+        return false;
+      }
+    }).length;
   };
 
   // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      hour12: true
-    }).format(date);
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'N/A';
+      
+      return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: true
+      }).format(date);
+    } catch (e) {
+      return 'N/A';
+    }
+  };
+
+  // Get days until maintenance
+  const getDaysUntilMaintenance = (nextMaintenanceDate) => {
+    if (!nextMaintenanceDate) return null;
+    
+    try {
+      const today = new Date();
+      const nextDate = new Date(nextMaintenanceDate);
+      
+      // Calculate difference in days
+      const diffTime = nextDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      return diffDays;
+    } catch (e) {
+      return null;
+    }
   };
 
   // Handle view equipment schedule
@@ -146,6 +218,11 @@ function EquipmentList() {
     if (statusFilter !== 'all') {
       filteredList = filteredList.filter(resource => {
         const status = getResourceStatus(resource.id);
+        
+        if (statusFilter === 'maintenance') {
+          return status === 'maintenance-due' || status === 'maintenance-overdue';
+        }
+        
         return status === statusFilter;
       });
     }
@@ -154,11 +231,26 @@ function EquipmentList() {
     return filteredList.sort((a, b) => {
       switch (sortBy) {
         case 'name':
-          return a.title.localeCompare(b.title);
-        case 'status':
-          return getResourceStatus(a.id).localeCompare(getResourceStatus(b.id));
+          return (a.title || '').localeCompare(b.title || '');
+        case 'status': {
+          const statusA = getResourceStatus(a.id);
+          const statusB = getResourceStatus(b.id);
+          // Maintenance status should come first, then in-use, then available
+          const statusOrder = { 
+            'maintenance-overdue': 0, 
+            'maintenance-due': 1, 
+            'in-use': 2, 
+            'available': 3 
+          };
+          return (statusOrder[statusA] || 4) - (statusOrder[statusB] || 4);
+        }
         case 'reservations':
           return countReservations(b.id) - countReservations(a.id);
+        case 'maintenance': {
+          const daysA = a.nextMaintenance ? getDaysUntilMaintenance(a.nextMaintenance) : 9999;
+          const daysB = b.nextMaintenance ? getDaysUntilMaintenance(b.nextMaintenance) : 9999;
+          return (daysA || 9999) - (daysB || 9999);
+        }
         default:
           return 0;
       }
@@ -176,35 +268,35 @@ function EquipmentList() {
     }
   };
 
+  // Get status badge class
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'available': return 'badge-success';
+      case 'in-use': return 'badge-danger';
+      case 'maintenance-due': return 'badge-maintenance';
+      case 'maintenance-overdue': return 'badge-maintenance-overdue';
+      default: return '';
+    }
+  };
+
+  // Get formatted status text
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'available': return 'Available';
+      case 'in-use': return 'In Use';
+      case 'maintenance-due': return 'Maintenance Due';
+      case 'maintenance-overdue': return 'Maintenance Overdue';
+      default: return 'Unknown';
+    }
+  };
+
   return (
     <div className="dashboard-container">
       <div className="content-header">
         <h1>{getDisplayName()} - Equipment List</h1>
-        <div className="header-actions">
-          {/* Auto-refresh toggle */}
+        <div className="header-actions">          
           <button 
-            className={`btn ${autoRefresh ? 'btn-primary' : 'btn-outline-primary'}`}
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
-          >
-            <i className={`fas fa-${autoRefresh ? 'sync-alt fa-spin' : 'sync-alt'} me-1`}></i>
-            {autoRefresh ? "Auto" : "Manual"}
-          </button>
-          
-          {/* Manual refresh button - only show when auto is off */}
-          {!autoRefresh && (
-            <button 
-              className="btn btn-outline-secondary ms-2"
-              onClick={loadTenantData}
-              title="Refresh data"
-            >
-              <i className="fas fa-redo-alt me-1"></i>
-              Refresh
-            </button>
-          )}
-          
-          <button 
-            className="btn btn-outline-secondary ms-2"
+            className="btn btn-outline-primary"
             onClick={() => navigate(`/${tenantId}`)}
           >
             <i className="fas fa-calendar-alt me-1"></i>
@@ -221,9 +313,6 @@ function EquipmentList() {
         <div className="error-message">
           <h3>Error</h3>
           <p>{error}</p>
-          <button className="btn btn-primary mt-3" onClick={() => navigate('/')}>
-            Return to Main Dashboard
-          </button>
         </div>
       ) : (
         <div className="equipment-list">
@@ -238,6 +327,7 @@ function EquipmentList() {
                 <option value="all">All Equipment</option>
                 <option value="available">Available Now</option>
                 <option value="in-use">In Use Now</option>
+                <option value="maintenance">Maintenance Required</option>
               </select>
             </div>
             
@@ -251,6 +341,7 @@ function EquipmentList() {
                 <option value="name">Name</option>
                 <option value="status">Current Status</option>
                 <option value="reservations">Total Reservations</option>
+                <option value="maintenance">Maintenance Due Date</option>
               </select>
             </div>
           </div>
@@ -267,7 +358,7 @@ function EquipmentList() {
                   <th>Equipment</th>
                   <th>Status</th>
                   <th>Total Reservations</th>
-                  <th>Next Reservation</th>
+                  <th>Next Reservation / Maintenance</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -275,18 +366,31 @@ function EquipmentList() {
                 {getFilteredResources().map(resource => {
                   const status = getResourceStatus(resource.id);
                   const nextReservation = getNextReservation(resource.id);
+                  const maintenanceDays = resource.nextMaintenance ? 
+                    getDaysUntilMaintenance(resource.nextMaintenance) : null;
                   
                   return (
                     <tr key={resource.id}>
                       <td>{resource.title}</td>
                       <td>
-                        <span className={`badge ${status === 'available' ? 'badge-success' : 'badge-danger'}`}>
-                          {status === 'available' ? 'Available' : 'In Use'}
+                        <span className={`badge ${getStatusBadgeClass(status)}`}>
+                          {getStatusText(status)}
                         </span>
                       </td>
                       <td>{countReservations(resource.id)}</td>
                       <td>
-                        {nextReservation ? (
+                        {(status === 'maintenance-due' || status === 'maintenance-overdue') && resource.nextMaintenance ? (
+                          <div>
+                            <div><strong>Maintenance:</strong> {new Date(resource.nextMaintenance).toLocaleDateString()}</div>
+                            {maintenanceDays !== null && (
+                              <div className="small text-muted">
+                                {maintenanceDays <= 0 ? 
+                                  `${Math.abs(maintenanceDays)} days overdue` : 
+                                  `Due in ${maintenanceDays} days`}
+                              </div>
+                            )}
+                          </div>
+                        ) : nextReservation ? (
                           <div>
                             <div>{formatDate(nextReservation.start)}</div>
                             <div className="small text-muted">{nextReservation.title}</div>
