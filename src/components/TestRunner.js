@@ -174,8 +174,23 @@ const TestRunner = () => {
         </button>
       </div>
       
+      {/* Progress bar - Add this section */}
+      {isRunning && (
+        <div className="progress-container">
+          <div className="progress-bar">
+            <div 
+              className="progress-fill" 
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          <div className="progress-text">
+            Running tests... {progress}%
+          </div>
+        </div>
+      )}
+      
       {testResults && (
-        <div className="test-results">
+        <div className="test-results" ref={resultsSectionRef}>
           <div className="results-summary">
             <div className="result-card">
               <div className="result-value">{testResults.totalTests}</div>
