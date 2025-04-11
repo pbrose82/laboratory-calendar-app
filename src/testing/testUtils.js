@@ -1,6 +1,9 @@
 // src/testing/testUtils.js
 import axios from 'axios';
 
+// Check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined' && window.document;
+
 /**
  * Test framework utilities for the Laboratory Calendar application
  */
@@ -405,8 +408,9 @@ export const apiTestUtils = {
 
 /**
  * UI test utilities for React component testing
+ * These methods will only work in a browser environment
  */
-export const uiTestUtils = {
+export const uiTestUtils = isBrowser ? {
   /**
    * Simulate a click event on an element
    * @param {HTMLElement} element - Element to click
@@ -498,6 +502,18 @@ export const uiTestUtils = {
    * @returns {Promise<void>}
    */
   async wait(ms = 500) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+} : {
+  // Stub implementations for non-browser environments
+  click: () => console.log('UI testing not available in non-browser environment'),
+  changeInput: () => console.log('UI testing not available in non-browser environment'),
+  selectOption: () => console.log('UI testing not available in non-browser environment'),
+  waitForElement: async () => {
+    console.log('UI testing not available in non-browser environment');
+    return null;
+  },
+  wait: async (ms = 500) => {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 };
