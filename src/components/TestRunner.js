@@ -1,5 +1,5 @@
 // src/components/TestRunner.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { runTests } from '../testing/testUtils';
 import { allApiTestSuites } from '../testing/tests/apiTests';
 // Import UI tests only in browser environment
@@ -16,6 +16,9 @@ const TestRunner = () => {
   const [expandedSuites, setExpandedSuites] = useState({});
   const [saveHistory, setSaveHistory] = useState(true);
   const [testHistory, setTestHistory] = useState([]);
+  const [progress, setProgress] = useState(0);
+  const progressRef = useRef(null);
+  const resultsSectionRef = useRef(null);
 
   // Load test history from localStorage on component mount
   useEffect(() => {
@@ -28,11 +31,21 @@ const TestRunner = () => {
       }
     }
   }, []);
+  
+  // Progress callback function
+  const updateProgress = (progressData) => {
+    if (progressData.phase === 'complete') {
+      setProgress(100);
+    } else {
+      setProgress(Math.round(progressData.progress * 100));
+    }
+  };
 
   // Handle running tests
   const handleRunTests = async () => {
     setIsRunning(true);
     setTestResults(null);
+    setProgress(0);
     
     try {
       // Determine which test suites to run
@@ -46,8 +59,8 @@ const TestRunner = () => {
         suitesToRun.push(...allUiTestSuites);
       }
       
-      // Run the tests
-      const results = await runTests(suitesToRun);
+      // Run the tests with progress updates
+      const results = await runTests(suitesToRun, updateProgress);
       setTestResults(results);
       
       // Add to history if enabled
@@ -69,6 +82,11 @@ const TestRunner = () => {
         
         // Save to localStorage
         localStorage.setItem('testRunHistory', JSON.stringify(newHistory));
+      }
+      
+      // Scroll to results
+      if (resultsSectionRef.current) {
+        resultsSectionRef.current.scrollIntoView({ behavior: 'smooth' });
       }
     } catch (error) {
       console.error('Error running tests:', error);
@@ -245,7 +263,7 @@ const TestRunner = () => {
       )}
       
       {/* Test History */}
-      {testHistory.length > 0 && (
+      {testHistory.length > 0 ? (
         <div className="test-history">
           <div className="history-header">
             <h3>Test Run History</h3>
@@ -271,6 +289,18 @@ const TestRunner = () => {
             ))}
           </div>
         </div>
+      ) : (
+        testResults && (
+          <div className="test-history">
+            <div className="history-header">
+              <h3>Test Run History</h3>
+            </div>
+            <div className="empty-history">
+              <i className="fas fa-history"></i>
+              <p>No test history available yet. Enable "Save History" to keep a record of test runs.</p>
+            </div>
+          </div>
+        )
       )}
     </div>
   );
