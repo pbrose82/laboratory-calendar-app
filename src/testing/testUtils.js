@@ -521,9 +521,10 @@ export const uiTestUtils = isBrowser ? {
 /**
  * Run a test suite and generate a report
  * @param {Array<Object>} suites - Array of test suites to run
+ * @param {Function} progressCallback - Optional callback for progress updates
  * @returns {Promise<Object>} Test report
  */
-export const runTests = async (suites) => {
+export const runTests = async (suites, progressCallback = null) => {
   const startTime = new Date();
   
   testLog(`Starting test run with ${suites.length} suites`);
@@ -539,13 +540,43 @@ export const runTests = async (suites) => {
     totalDuration: 0
   };
   
+  // Calculate total tests for progress reporting
+  const totalTests = suites.reduce((sum, suite) => sum + suite.tests.length, 0);
+  let completedTests = 0;
+  
   for (const suite of suites) {
+    // Report progress before starting suite
+    if (progressCallback) {
+      progressCallback({
+        phase: 'suite-start',
+        suiteName: suite.name,
+        progress: completedTests / totalTests,
+        completedTests,
+        totalTests
+      });
+    }
+    
     const suiteResult = await suite.run();
     results.suites.push(suiteResult);
     results.totalTests += suiteResult.tests.length;
     results.passed += suiteResult.passed;
     results.failed += suiteResult.failed;
     results.skipped += suiteResult.skipped;
+    
+    // Update completed tests count
+    completedTests += suiteResult.tests.length;
+    
+    // Report progress after suite completes
+    if (progressCallback) {
+      progressCallback({
+        phase: 'suite-complete',
+        suiteName: suite.name,
+        suiteResult,
+        progress: completedTests / totalTests,
+        completedTests,
+        totalTests
+      });
+    }
   }
   
   results.endTime = new Date();
@@ -553,6 +584,17 @@ export const runTests = async (suites) => {
   
   testLog(`Test run completed in ${results.totalDuration}ms`);
   testLog(`Total: ${results.totalTests}, Passed: ${results.passed}, Failed: ${results.failed}, Skipped: ${results.skipped}`);
+  
+  // Final progress report
+  if (progressCallback) {
+    progressCallback({
+      phase: 'complete',
+      results,
+      progress: 1,
+      completedTests,
+      totalTests
+    });
+  }
   
   return results;
 };
