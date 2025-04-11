@@ -1,5 +1,5 @@
 // src/testing/tests/apiTests.js
-import { createTestSuite, assert, apiTestUtils, TestConfig } from '../testUtils';
+import { createTestSuite, assert, apiTestUtils, TestConfig, registerTenantForCleanup } from '../testUtils';
 
 /**
  * Tenant API Test Suite
@@ -17,6 +17,10 @@ export const tenantApiTests = createTestSuite('Tenant API Tests', (suite) => {
       tenantId: testTenantId,
       tenantName: `Test Tenant ${timestamp}`
     });
+    
+    // Register the tenant for cleanup
+    registerTenantForCleanup(testTenantId);
+    console.log(`Test tenant ${testTenantId} created and registered for cleanup`);
   });
   
   // Cleanup: Delete the test tenant after all tests
@@ -62,6 +66,9 @@ export const tenantApiTests = createTestSuite('Tenant API Tests', (suite) => {
         tenantName: 'Test Create Tenant'
       });
       
+      // Register for cleanup
+      registerTenantForCleanup(newTenantId);
+      
       assert.isDefined(response.success, 'Response should have success property');
       assert.isTrue(response.success, 'Response success should be true');
       assert.isDefined(response.data, 'Response should have data property');
@@ -89,6 +96,9 @@ export const tenantApiTests = createTestSuite('Tenant API Tests', (suite) => {
       tenantId: tempTenantId,
       tenantName: 'Test Delete Tenant'
     });
+    
+    // Register for cleanup in case deletion fails in the test
+    registerTenantForCleanup(tempTenantId);
     
     // Delete the tenant
     const response = await apiTestUtils.delete(`/tenants/${tempTenantId}`);
@@ -124,6 +134,10 @@ export const calendarEventApiTests = createTestSuite('Calendar Events API Tests'
       tenantId: testTenantId,
       tenantName: `Test Events Tenant ${timestamp}`
     });
+    
+    // Register the tenant for cleanup
+    registerTenantForCleanup(testTenantId);
+    console.log(`Events test tenant ${testTenantId} created and registered for cleanup`);
     
     // Create a test event
     const startDate = new Date();
@@ -278,6 +292,10 @@ export const resourceApiTests = createTestSuite('Resources API Tests', (suite) =
       tenantId: testTenantId,
       tenantName: `Test Resources Tenant ${timestamp}`
     });
+    
+    // Register the tenant for cleanup
+    registerTenantForCleanup(testTenantId);
+    console.log(`Resources test tenant ${testTenantId} created and registered for cleanup`);
     
     // Add resources by creating events with equipment names
     for (let i = 1; i <= 3; i++) {
