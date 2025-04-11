@@ -44,7 +44,22 @@ export const registerTenantForCleanup = (tenantId) => {
     console.log(`Registered tenant for cleanup: ${tenantId}`);
   }
 };
+// Add this function to testUtils.js, right after registerTenantForCleanup function:
 
+/**
+ * Remove a tenant from the cleanup list
+ * @param {string} tenantId - ID of the tenant to remove from cleanup
+ * @returns {boolean} Whether the tenant was found and removed
+ */
+export const removeTenantFromCleanup = (tenantId) => {
+  const index = testResourcesToCleanup.tenants.indexOf(tenantId);
+  if (index !== -1) {
+    testResourcesToCleanup.tenants.splice(index, 1);
+    console.log(`Removed tenant from cleanup list: ${tenantId}`);
+    return true;
+  }
+  return false;
+};
 /**
  * Logger function that respects verbose setting
  * @param {string} message - Message to log
