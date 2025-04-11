@@ -1,6 +1,9 @@
 // src/testing/tests/uiTests.js
 import { createTestSuite, assert, uiTestUtils } from '../testUtils';
 
+// Check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined' && window.document;
+
 /**
  * Calendar UI Test Suite
  */
@@ -250,8 +253,9 @@ export const resourceViewsUiTests = createTestSuite('Resource Views UI Tests', (
 /**
  * Export all UI test suites
  */
-export const allUiTestSuites = [
+// Only initialize UI test suites if we're in a browser environment
+export const allUiTestSuites = isBrowser ? [
   calendarUiTests.initialize(),
   adminUiTests.initialize(),
   resourceViewsUiTests.initialize()
-];
+] : [];
