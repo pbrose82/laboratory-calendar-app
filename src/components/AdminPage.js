@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { fetchAllTenants, createNewTenant, deleteTenantById } from '../services/apiClient';
 import SwaggerDocs from './SwaggerDocs';
+import TestRunner from './TestRunner';
 import './AdminPage.css';
 
 function AdminPage() {
@@ -13,7 +14,7 @@ function AdminPage() {
   const [statusMessage, setStatusMessage] = useState('');
   const [statusType, setStatusType] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const [activeTab, setActiveTab] = useState('tenants'); // 'tenants' or 'api-docs'
+  const [activeTab, setActiveTab] = useState('tenants'); // 'tenants', 'api-docs', or 'tests'
 
   // Base URL for tenant links - use window.location for Render host
   const baseUrl = window.location.origin;
@@ -255,10 +256,19 @@ function AdminPage() {
           <i className="fas fa-book me-2"></i>
           API Documentation
         </button>
+        <button 
+          className={`tab-btn ${activeTab === 'tests' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tests')}
+        >
+          <i className="fas fa-vial me-2"></i>
+          Automated Testing
+        </button>
       </div>
       
       <div className="admin-page">
-        {activeTab === 'tenants' ? renderTenantSection() : <SwaggerDocs />}
+        {activeTab === 'tenants' ? renderTenantSection() : 
+         activeTab === 'api-docs' ? <SwaggerDocs /> : 
+         <TestRunner />}
       </div>
     </div>
   );
