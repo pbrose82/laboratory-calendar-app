@@ -9,9 +9,10 @@ const isBrowser = typeof window !== 'undefined' && window.document;
 /**
  * Main entry point for running all tests
  * @param {Object} options - Test run options
+ * @param {Function} progressCallback - Optional callback for progress updates
  * @returns {Promise<Object>} Test results
  */
-export const runAllTests = async (options = {}) => {
+export const runAllTests = async (options = {}, progressCallback = null) => {
   // Update test configuration if options provided
   if (options.apiBaseUrl) {
     TestConfig.apiBaseUrl = options.apiBaseUrl;
@@ -43,7 +44,7 @@ export const runAllTests = async (options = {}) => {
   }
   
   // Run the tests
-  return runTests(suitesToRun);
+  return runTests(suitesToRun, progressCallback);
 };
 
 /**
