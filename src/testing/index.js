@@ -1,5 +1,5 @@
 // src/testing/index.js
-import { runTests, TestConfig } from './testUtils';
+import { runTests, TestConfig, cleanupTestResources } from './testUtils';
 import { allApiTestSuites } from './tests/apiTests';
 import { allUiTestSuites } from './tests/uiTests';
 
@@ -43,17 +43,32 @@ export const runAllTests = async (options = {}, progressCallback = null) => {
     console.warn('UI tests cannot be run in a non-browser environment');
   }
   
-  // Run the tests
-  return runTests(suitesToRun, progressCallback);
+  try {
+    // Run the tests
+    const results = await runTests(suitesToRun, progressCallback);
+    
+    // Clean up test resources
+    await cleanupTestResources();
+    
+    return results;
+  } catch (error) {
+    console.error('Error running tests:', error);
+    
+    // Ensure cleanup happens even if tests fail
+    await cleanupTestResources();
+    
+    throw error;
+  }
 };
 
 /**
  * Run a specific test suite by name
  * @param {string} suiteName - Name of the test suite to run
  * @param {Object} options - Test run options
+ * @param {Function} progressCallback - Optional callback for progress updates
  * @returns {Promise<Object>} Test results
  */
-export const runTestSuite = async (suiteName, options = {}) => {
+export const runTestSuite = async (suiteName, options = {}, progressCallback = null) => {
   // Update test configuration if options provided
   if (options.apiBaseUrl) {
     TestConfig.apiBaseUrl = options.apiBaseUrl;
@@ -86,7 +101,21 @@ export const runTestSuite = async (suiteName, options = {}) => {
   }
   
   // Run the test suite
-  return runTests([targetSuite]);
+  try {
+    const results = await runTests([targetSuite], progressCallback);
+    
+    // Clean up test resources
+    await cleanupTestResources();
+    
+    return results;
+  } catch (error) {
+    console.error(`Error running test suite ${suiteName}:`, error);
+    
+    // Ensure cleanup happens even if tests fail
+    await cleanupTestResources();
+    
+    throw error;
+  }
 };
 
 /**
@@ -101,6 +130,6 @@ export const getAvailableTestSuites = () => {
 };
 
 // Export all test suites and utilities
-export { TestConfig } from './testUtils';
+export { TestConfig, cleanupTestResources } from './testUtils';
 export { allApiTestSuites } from './tests/apiTests';
 export { allUiTestSuites } from './tests/uiTests';
