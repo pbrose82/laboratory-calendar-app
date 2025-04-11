@@ -1,10 +1,12 @@
 // src/components/TestRunner.js
 import React, { useState, useEffect, useRef } from 'react';
-import { runTests } from '../testing/testUtils';
+import { runTests, cleanupTestResources } from '../testing/testUtils';
 import { allApiTestSuites } from '../testing/tests/apiTests';
 // Import UI tests only in browser environment
 import { allUiTestSuites } from '../testing/tests/uiTests';
 import './TestRunner.css';
+
+const HISTORY_STORAGE_KEY = 'labCalendarTestHistory';
 
 const TestRunner = () => {
   const [isRunning, setIsRunning] = useState(false);
@@ -17,27 +19,43 @@ const TestRunner = () => {
   const [saveHistory, setSaveHistory] = useState(true);
   const [testHistory, setTestHistory] = useState([]);
   const [progress, setProgress] = useState(0);
+  const [logMessages, setLogMessages] = useState([]);
   const progressRef = useRef(null);
   const resultsSectionRef = useRef(null);
 
   // Load test history from localStorage on component mount
   useEffect(() => {
-    const savedHistory = localStorage.getItem('testRunHistory');
-    if (savedHistory) {
-      try {
-        setTestHistory(JSON.parse(savedHistory));
-      } catch (error) {
-        console.error('Error loading test history:', error);
+    try {
+      const savedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
+      
+      if (savedHistory) {
+        const parsedHistory = JSON.parse(savedHistory);
+        console.log("Loaded test history:", parsedHistory);
+        setTestHistory(parsedHistory);
+      } else {
+        console.log("No saved test history found");
       }
+    } catch (error) {
+      console.error('Error loading test history:', error);
+      addLogMessage(`Error loading test history: ${error.message}`);
     }
   }, []);
+  
+  const addLogMessage = (message) => {
+    setLogMessages(prev => [...prev, { time: new Date().toLocaleTimeString(), message }]);
+  };
   
   // Progress callback function
   const updateProgress = (progressData) => {
     if (progressData.phase === 'complete') {
       setProgress(100);
+      addLogMessage("Tests completed");
     } else {
-      setProgress(Math.round(progressData.progress * 100));
+      const progressPercent = Math.round(progressData.progress * 100);
+      setProgress(progressPercent);
+      if (progressData.suiteName) {
+        addLogMessage(`Running suite: ${progressData.suiteName} (${progressPercent}%)`);
+      }
     }
   };
 
@@ -46,6 +64,8 @@ const TestRunner = () => {
     setIsRunning(true);
     setTestResults(null);
     setProgress(0);
+    setLogMessages([]);
+    addLogMessage("Starting test run...");
     
     try {
       // Determine which test suites to run
@@ -53,15 +73,18 @@ const TestRunner = () => {
       
       if (selectedSuites.api) {
         suitesToRun.push(...allApiTestSuites);
+        addLogMessage("Including API test suites");
       }
       
       if (selectedSuites.ui) {
         suitesToRun.push(...allUiTestSuites);
+        addLogMessage("Including UI test suites");
       }
       
       // Run the tests with progress updates
       const results = await runTests(suitesToRun, updateProgress);
       setTestResults(results);
+      addLogMessage(`Tests complete - ${results.passed} passed, ${results.failed} failed`);
       
       // Add to history if enabled
       if (saveHistory) {
@@ -81,7 +104,23 @@ const TestRunner = () => {
         setTestHistory(newHistory);
         
         // Save to localStorage
-        localStorage.setItem('testRunHistory', JSON.stringify(newHistory));
+        try {
+          localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(newHistory));
+          addLogMessage("Test history saved to localStorage");
+        } catch (storageError) {
+          console.error("Error saving test history:", storageError);
+          addLogMessage(`Error saving test history: ${storageError.message}`);
+        }
+      }
+      
+      // Ensure cleanup happens after tests
+      addLogMessage("Cleaning up test resources...");
+      try {
+        await cleanupTestResources();
+        addLogMessage("Test resources cleaned up successfully");
+      } catch (cleanupError) {
+        console.error("Error cleaning up test resources:", cleanupError);
+        addLogMessage(`Error cleaning up test resources: ${cleanupError.message}`);
       }
       
       // Scroll to results
@@ -90,6 +129,15 @@ const TestRunner = () => {
       }
     } catch (error) {
       console.error('Error running tests:', error);
+      addLogMessage(`Error running tests: ${error.message}`);
+      
+      // Still try to clean up even if tests fail
+      try {
+        await cleanupTestResources();
+        addLogMessage("Test resources cleaned up after error");
+      } catch (cleanupError) {
+        addLogMessage(`Error cleaning up test resources: ${cleanupError.message}`);
+      }
     } finally {
       setIsRunning(false);
     }
@@ -106,7 +154,8 @@ const TestRunner = () => {
   // Clear test history
   const clearHistory = () => {
     setTestHistory([]);
-    localStorage.removeItem('testRunHistory');
+    localStorage.removeItem(HISTORY_STORAGE_KEY);
+    addLogMessage("Test history cleared");
   };
 
   // Format duration in ms to readable format
@@ -174,7 +223,7 @@ const TestRunner = () => {
         </button>
       </div>
       
-      {/* Progress bar - Add this section */}
+      {/* Progress bar */}
       {isRunning && (
         <div className="progress-container">
           <div className="progress-bar">
@@ -185,6 +234,20 @@ const TestRunner = () => {
           </div>
           <div className="progress-text">
             Running tests... {progress}%
+          </div>
+        </div>
+      )}
+      
+      {/* Log messages */}
+      {logMessages.length > 0 && (
+        <div className="test-log">
+          <h4>Test Log</h4>
+          <div className="log-container">
+            {logMessages.map((log, index) => (
+              <div key={index} className="log-message">
+                <span className="log-time">[{log.time}]</span> {log.message}
+              </div>
+            ))}
           </div>
         </div>
       )}
