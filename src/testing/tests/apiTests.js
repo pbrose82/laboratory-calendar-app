@@ -282,20 +282,14 @@ export const tenantApiTests = createTestSuite('Tenant API Tests', (suite) => {
       // If we reached here, the test passed
       console.log('Verified tenant was deleted successfully');
       
-      // Remove from cleanup list since we deleted it
-      const cleanupIndex = testResourcesToCleanup.tenants.indexOf(tempTenantId);
-      if (cleanupIndex !== -1) {
-        testResourcesToCleanup.tenants.splice(cleanupIndex, 1);
-      }
-      
+      // Note: Don't need to manually remove from cleanup list anymore,
+      // since the tenant is already deleted
     } catch (error) {
       console.error(`Error in delete tenant test: ${error.message}`);
       
-      // If temp tenant was created but not deleted, ensure it's in the cleanup list
+      // If temp tenant was created but not deleted, ensure it's registered for cleanup
       if (tempTenantCreated) {
-        if (!testResourcesToCleanup.tenants.includes(tempTenantId)) {
-          registerTenantForCleanup(tempTenantId);
-        }
+        registerTenantForCleanup(tempTenantId);
       }
       
       throw error;
