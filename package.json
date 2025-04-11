@@ -10,6 +10,7 @@
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.6.7",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "express": "^4.18.3",
@@ -27,6 +28,9 @@
     "dev-server": "node server.js",
     "dev": "concurrently \"npm run dev-client\" \"npm run dev-server\"",
     "test": "react-scripts test",
+    "test:api": "node -e \"require('./src/testing').runAllTests({testType: 'api'}).then(console.log)\"",
+    "test:ui": "node -e \"require('./src/testing').runAllTests({testType: 'ui'}).then(console.log)\"",
+    "test:all": "node -e \"require('./src/testing').runAllTests().then(console.log)\"",
     "eject": "react-scripts eject",
     "render-postbuild": "npm run build"
   },
