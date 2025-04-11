@@ -23,7 +23,9 @@ export const tenantApiTests = createTestSuite('Tenant API Tests', (suite) => {
   suite.setAfterAll(async () => {
     if (testTenantId) {
       try {
+        console.log(`Cleaning up test tenant: ${testTenantId}`);
         await apiTestUtils.delete(`/tenants/${testTenantId}`);
+        console.log(`Test tenant ${testTenantId} deleted successfully`);
       } catch (error) {
         console.error(`Error cleaning up test tenant: ${error.message}`);
       }
@@ -148,7 +150,9 @@ export const calendarEventApiTests = createTestSuite('Calendar Events API Tests'
   suite.setAfterAll(async () => {
     if (testTenantId) {
       try {
+        console.log(`Cleaning up test tenant: ${testTenantId}`);
         await apiTestUtils.delete(`/tenants/${testTenantId}`);
+        console.log(`Test tenant ${testTenantId} deleted successfully`);
       } catch (error) {
         console.error(`Error cleaning up test tenant: ${error.message}`);
       }
