@@ -20,6 +20,23 @@ export const TestConfig = {
   verbose: true
 };
 
+// Global variable to keep track of resources that need cleanup
+const testResourcesToCleanup = {
+  tenants: [],
+  events: []
+};
+
+/**
+ * Register a test tenant to be cleaned up
+ * @param {string} tenantId - ID of the tenant to be cleaned up
+ */
+export const registerTenantForCleanup = (tenantId) => {
+  if (!testResourcesToCleanup.tenants.includes(tenantId)) {
+    testResourcesToCleanup.tenants.push(tenantId);
+    console.log(`Registered tenant for cleanup: ${tenantId}`);
+  }
+};
+
 /**
  * Logger function that respects verbose setting
  * @param {string} message - Message to log
@@ -361,6 +378,9 @@ export const apiTestUtils = {
       tenantName: `Test Tenant ${idSuffix}`
     });
     
+    // Register for cleanup
+    registerTenantForCleanup(tenantId);
+    
     return response.data;
   },
   
@@ -597,4 +617,49 @@ export const runTests = async (suites, progressCallback = null) => {
   }
   
   return results;
+};
+
+/**
+ * Clean up all test resources created during testing
+ * @returns {Promise<void>}
+ */
+export const cleanupTestResources = async () => {
+  console.log('Starting cleanup of test resources...');
+  
+  // Clean up test tenants
+  const tenantsToCleanup = [...testResourcesToCleanup.tenants];
+  console.log(`Found ${tenantsToCleanup.length} tenants to clean up`);
+  
+  for (const tenantId of tenantsToCleanup) {
+    try {
+      console.log(`Cleaning up tenant: ${tenantId}`);
+      await apiTestUtils.delete(`/tenants/${tenantId}`);
+      console.log(`Successfully deleted tenant: ${tenantId}`);
+      
+      // Remove from cleanup list
+      const index = testResourcesToCleanup.tenants.indexOf(tenantId);
+      if (index !== -1) {
+        testResourcesToCleanup.tenants.splice(index, 1);
+      }
+    } catch (error) {
+      console.error(`Error deleting tenant ${tenantId}:`, error.message);
+      
+      // If it's a 404 error, tenant doesn't exist anymore, so remove from cleanup list
+      if (error.message && error.message.includes('404')) {
+        const index = testResourcesToCleanup.tenants.indexOf(tenantId);
+        if (index !== -1) {
+          testResourcesToCleanup.tenants.splice(index, 1);
+        }
+      }
+    }
+  }
+  
+  // Clear any remaining cleanup items
+  if (testResourcesToCleanup.tenants.length === 0) {
+    console.log('All test tenants cleaned up successfully');
+  } else {
+    console.warn(`${testResourcesToCleanup.tenants.length} tenants could not be cleaned up`);
+  }
+  
+  return true;
 };
