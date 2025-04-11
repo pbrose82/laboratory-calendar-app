@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { runTests } from '../testing/testUtils';
 import { allApiTestSuites } from '../testing/tests/apiTests';
+// Import UI tests only in browser environment
 import { allUiTestSuites } from '../testing/tests/uiTests';
 import './TestRunner.css';
 
