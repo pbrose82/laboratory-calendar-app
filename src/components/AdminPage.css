@@ -58,6 +58,7 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   padding: 20px;
   margin-bottom: 30px;
+  border: 1px solid #e9ecef;
 }
 
 .admin-section h3 {
@@ -143,7 +144,11 @@
   color: #2c3e50;
 }
 
-.tenant-table tr:hover {
+.tenant-table tbody tr {
+  background-color: white;
+}
+
+.tenant-table tbody tr:hover {
   background-color: #f9f9f9;
 }
 
