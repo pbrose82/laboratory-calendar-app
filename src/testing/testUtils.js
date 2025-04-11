@@ -57,6 +57,154 @@ export const testLog = (message, level = 'log') => {
 };
 
 /**
+ * API diagnostics for debugging
+ * @param {string} endpoint - API endpoint to diagnose
+ * @param {string} method - HTTP method
+ * @param {object} data - Request data
+ */
+export const diagnoseApiIssue = async (endpoint, method = 'GET', data = null) => {
+  console.log(`\n=== API DIAGNOSTICS: ${method} ${endpoint} ===`);
+  
+  try {
+    // Test direct fetch request
+    console.log('Trying fetch...');
+    const fetchUrl = `${TestConfig.apiBaseUrl}/api${endpoint}`;
+    console.log(`Fetch URL: ${fetchUrl}`);
+    
+    const fetchOptions = {
+      method,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    };
+    
+    if (data && (method === 'POST' || method === 'PUT')) {
+      fetchOptions.body = JSON.stringify(data);
+    }
+    
+    const fetchResponse = await fetch(fetchUrl, fetchOptions);
+    console.log(`Fetch status: ${fetchResponse.status}`);
+    
+    try {
+      const fetchData = await fetchResponse.json();
+      console.log('Fetch response data:', fetchData);
+    } catch (e) {
+      console.log('Could not parse fetch response as JSON:', e.message);
+    }
+  } catch (fetchError) {
+    console.error('Fetch request failed:', fetchError.message);
+  }
+  
+  try {
+    // Test axios request
+    console.log('\nTrying axios...');
+    const axiosUrl = `${TestConfig.apiBaseUrl}/api${endpoint}`;
+    console.log(`Axios URL: ${axiosUrl}`);
+    
+    let axiosResponse;
+    if (method === 'GET') {
+      axiosResponse = await axios.get(axiosUrl);
+    } else if (method === 'POST') {
+      axiosResponse = await axios.post(axiosUrl, data);
+    } else if (method === 'PUT') {
+      axiosResponse = await axios.put(axiosUrl, data);
+    } else if (method === 'DELETE') {
+      axiosResponse = await axios.delete(axiosUrl);
+    }
+    
+    console.log(`Axios status: ${axiosResponse.status}`);
+    console.log('Axios response data:', axiosResponse.data);
+  } catch (axiosError) {
+    console.error('Axios request failed:', axiosError.message);
+    if (axiosError.response) {
+      console.log('Axios error response status:', axiosError.response.status);
+      console.log('Axios error response data:', axiosError.response.data);
+    }
+  }
+  
+  console.log('=== END API DIAGNOSTICS ===\n');
+};
+
+/**
+ * Diagnose test environment before running tests
+ */
+export const preDiagnoseTestEnvironment = async () => {
+  console.log('\n=== PRE-TEST ENVIRONMENT DIAGNOSIS ===');
+  
+  // Check API configuration
+  console.log('API Base URL:', TestConfig.apiBaseUrl);
+  
+  // Check tenant list
+  await diagnoseApiIssue('/tenants', 'GET');
+  
+  // Try creating a test tenant
+  const diagnosticTenantId = `diagnostic-tenant-${Date.now()}`;
+  await diagnoseApiIssue('/tenants', 'POST', {
+    tenantId: diagnosticTenantId,
+    tenantName: 'Diagnostic Tenant'
+  });
+  
+  // Try getting the new tenant
+  await diagnoseApiIssue(`/tenants/${diagnosticTenantId}`, 'GET');
+  
+  // Try deleting the diagnostic tenant
+  await diagnoseApiIssue(`/tenants/${diagnosticTenantId}`, 'DELETE');
+  
+  // Check if it was deleted
+  await diagnoseApiIssue(`/tenants/${diagnosticTenantId}`, 'GET');
+  
+  console.log('=== END PRE-TEST ENVIRONMENT DIAGNOSIS ===\n');
+  
+  // Return true so this can be awaited if needed
+  return true;
+};
+
+/**
+ * Force cleanup all test tenants - use in emergencies
+ */
+export const forceCleanupAllTestTenants = async () => {
+  console.log('\n=== FORCE CLEANUP ALL TEST TENANTS ===');
+  
+  try {
+    // Get all tenants 
+    const tenantsResponse = await apiTestUtils.get('/tenants');
+    const allTenants = tenantsResponse.data || [];
+    
+    console.log(`Found ${allTenants.length} total tenants`);
+    
+    // Filter to only test tenants (those with test- or diagnostic- prefix)
+    const testTenants = allTenants.filter(tenant => 
+      tenant.id.startsWith('test-') || 
+      tenant.id.startsWith('diagnostic-')
+    );
+    
+    console.log(`Identified ${testTenants.length} test tenants to clean up`);
+    
+    // Delete each one
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const tenant of testTenants) {
+      try {
+        console.log(`Attempting to delete test tenant: ${tenant.id}`);
+        await apiTestUtils.delete(`/tenants/${tenant.id}`);
+        console.log(`Successfully deleted: ${tenant.id}`);
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to delete ${tenant.id}: ${error.message}`);
+        failCount++;
+      }
+    }
+    
+    console.log(`Cleanup complete: ${successCount} succeeded, ${failCount} failed`);
+  } catch (error) {
+    console.error('Error in force cleanup:', error.message);
+  }
+  
+  console.log('=== END FORCE CLEANUP ===\n');
+};
+
+/**
  * Creates a test suite
  * @param {string} suiteName - Name of the test suite
  * @param {Function} testFn - Function containing the tests
@@ -852,7 +1000,16 @@ export const uiTestUtils = hasFullUiSupport ? {
 export const runTests = async (suites, progressCallback = null) => {
   const startTime = new Date();
   
-  testLog(`Starting test run with ${suites.length} suites`);
+  testLog(`Starting test run with ${suites.length} suites at ${startTime.toISOString()}`);
+  
+  // Add diagnostic checks and cleanup before tests
+  try {
+    await preDiagnoseTestEnvironment();
+    await forceCleanupAllTestTenants();
+  } catch (setupError) {
+    console.warn('Error in pre-test setup:', setupError.message);
+    // Continue with tests anyway
+  }
   
   const results = {
     suites: [],
@@ -1009,12 +1166,19 @@ export const runTests = async (suites, progressCallback = null) => {
     });
   }
   
+  // Make sure to add a final cleanup even if tests fail
+  try {
+    await forceCleanupAllTestTenants();
+  } catch (finalCleanupError) {
+    console.warn('Error in final cleanup:', finalCleanupError.message);
+  }
+  
   return results;
 };
 
 /**
  * Clean up all test resources created during testing
- * @returns {Promise<void>}
+ * @returns {Promise<Object>} Cleanup results
  */
 export const cleanupTestResources = async () => {
   console.log('Starting cleanup of test resources...');
@@ -1023,36 +1187,88 @@ export const cleanupTestResources = async () => {
   const tenantsToCleanup = [...testResourcesToCleanup.tenants];
   console.log(`Found ${tenantsToCleanup.length} tenants to clean up`);
   
+  // Track success rate for reporting
+  let successCount = 0;
+  let failCount = 0;
+  
   for (const tenantId of tenantsToCleanup) {
     try {
       console.log(`Cleaning up tenant: ${tenantId}`);
-      await apiTestUtils.delete(`/tenants/${tenantId}`);
-      console.log(`Successfully deleted tenant: ${tenantId}`);
       
-      // Remove from cleanup list
-      const index = testResourcesToCleanup.tenants.indexOf(tenantId);
-      if (index !== -1) {
-        testResourcesToCleanup.tenants.splice(index, 1);
+      // Try multiple deletion strategies
+      let deleteSuccess = false;
+      
+      // Strategy 1: Standard API endpoint with explicit try/catch
+      try {
+        const response = await apiTestUtils.delete(`/tenants/${tenantId}`);
+        console.log(`Tenant deletion response:`, response);
+        deleteSuccess = response?.success === true;
+      } catch (err1) {
+        console.log(`First deletion attempt failed for ${tenantId}:`, err1.message);
+        
+        // Strategy 2: Try with axios directly as fallback
+        try {
+          console.log(`Trying direct axios deletion for ${tenantId}`);
+          const url = `${TestConfig.apiBaseUrl}/api/tenants/${tenantId}`;
+          const response = await axios.delete(url);
+          
+          deleteSuccess = response?.data?.success === true;
+          console.log(`Direct deletion response:`, response?.data);
+        } catch (err2) {
+          console.warn(`All deletion attempts failed for ${tenantId}`);
+        }
       }
-    } catch (error) {
-      console.error(`Error deleting tenant ${tenantId}:`, error.message);
       
-      // If it's a 404 error, tenant doesn't exist anymore, so remove from cleanup list
-      if (error.message && error.message.includes('404')) {
+      // If successful deletion, remove from the list
+      if (deleteSuccess) {
+        console.log(`Successfully deleted tenant: ${tenantId}`);
+        successCount++;
+        
+        // Remove from cleanup list
         const index = testResourcesToCleanup.tenants.indexOf(tenantId);
         if (index !== -1) {
           testResourcesToCleanup.tenants.splice(index, 1);
         }
+      } else {
+        // Even if we couldn't delete, remove from list if it's a 404 (not found)
+        try {
+          const checkResponse = await apiTestUtils.get(`/tenants/${tenantId}`);
+          console.log(`Tenant ${tenantId} still exists after deletion attempts`);
+          failCount++;
+        } catch (error) {
+          if (error.message && error.message.includes('404')) {
+            console.log(`Tenant ${tenantId} not found (404), considering it deleted`);
+            successCount++;
+            
+            // Remove from cleanup list
+            const index = testResourcesToCleanup.tenants.indexOf(tenantId);
+            if (index !== -1) {
+              testResourcesToCleanup.tenants.splice(index, 1);
+            }
+          } else {
+            console.warn(`Error checking tenant ${tenantId}:`, error.message);
+            failCount++;
+          }
+        }
       }
+    } catch (error) {
+      console.error(`Unexpected error during cleanup for ${tenantId}:`, error);
+      failCount++;
     }
   }
   
-  // Clear any remaining cleanup items
+  // Log final status
+  console.log(`Cleanup complete: ${successCount} succeeded, ${failCount} failed`);
   if (testResourcesToCleanup.tenants.length === 0) {
     console.log('All test tenants cleaned up successfully');
   } else {
     console.warn(`${testResourcesToCleanup.tenants.length} tenants could not be cleaned up`);
   }
   
-  return true;
+  return {
+    success: successCount > 0,
+    cleanedCount: successCount,
+    failedCount: failCount,
+    remainingTenants: testResourcesToCleanup.tenants.length
+  };
 };
