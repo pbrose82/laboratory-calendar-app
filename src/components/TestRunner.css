@@ -1,4 +1,21 @@
-/* Progress bar styles */
+.empty-history {
+  text-align: center;
+  padding: 30px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  color: #6c757d;
+}
+
+.empty-history i {
+  font-size: 48px;
+  margin-bottom: 15px;
+  opacity: 0.5;
+}
+
+.empty-history p {
+  margin: 0;
+  font-size: 16px;
+}/* Progress bar styles */
 .progress-container {
   margin-top: 20px;
   width: 100%;
