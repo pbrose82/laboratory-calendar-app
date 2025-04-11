@@ -131,7 +131,7 @@ export const calendarEventApiTests = createTestSuite('Calendar Events API Tests'
     endDate.setHours(endDate.getHours() + 2);
     
     const eventResponse = await apiTestUtils.post('/calendar-events', {
-      tenantId,
+      tenantId: testTenantId,
       action: 'create',
       eventData: {
         title: 'Test Event',
