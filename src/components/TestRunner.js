@@ -263,7 +263,7 @@ const TestRunner = () => {
       )}
       
       {/* Test History */}
-      {testHistory.length > 0 && (
+      {testHistory.length > 0 ? (
         <div className="test-history">
           <div className="history-header">
             <h3>Test Run History</h3>
@@ -289,6 +289,18 @@ const TestRunner = () => {
             ))}
           </div>
         </div>
+      ) : (
+        testResults && (
+          <div className="test-history">
+            <div className="history-header">
+              <h3>Test Run History</h3>
+            </div>
+            <div className="empty-history">
+              <i className="fas fa-history"></i>
+              <p>No test history available yet. Enable "Save History" to keep a record of test runs.</p>
+            </div>
+          </div>
+        )
       )}
     </div>
   );
