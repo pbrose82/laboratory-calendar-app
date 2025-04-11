@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { runTests, cleanupTestResources } from '../testing/testUtils';
 import { allApiTestSuites } from '../testing/tests/apiTests';
-// Import UI tests only in browser environment
 import { allUiTestSuites } from '../testing/tests/uiTests';
 import './TestRunner.css';
 
@@ -20,6 +19,7 @@ const TestRunner = () => {
   const [expandedSuites, setExpandedSuites] = useState({});
   const [saveHistory, setSaveHistory] = useState(true);
   const [testHistory, setTestHistory] = useState([]);
+  const [expandedHistoryId, setExpandedHistoryId] = useState(null);
   const [progress, setProgress] = useState(0);
   const [logMessages, setLogMessages] = useState([]);
   const resultsSectionRef = useRef(null);
@@ -113,7 +113,14 @@ const TestRunner = () => {
             failed: partialResults.failed,
             skipped: partialResults.skipped,
             duration: partialResults.totalDuration
-          }
+          },
+          // Add information about which test suites were selected
+          testTypes: {
+            api: selectedSuites.api,
+            ui: selectedSuites.ui
+          },
+          // Include suite details (even if empty)
+          suites: []
         };
         
         const newHistory = [historyEntry, ...testHistory].slice(0, 10);
@@ -176,7 +183,26 @@ const TestRunner = () => {
             failed: results.failed,
             skipped: results.skipped,
             duration: results.totalDuration
-          }
+          },
+          // Add information about which test suites were selected
+          testTypes: {
+            api: selectedSuites.api,
+            ui: selectedSuites.ui
+          },
+          // Add full suite details for expandable view
+          suites: results.suites.map(suite => ({
+            name: suite.suiteName,
+            passed: suite.passed,
+            failed: suite.failed,
+            skipped: suite.skipped,
+            duration: suite.totalDuration,
+            tests: suite.tests.map(test => ({
+              name: test.name,
+              status: test.status,
+              duration: test.duration,
+              error: test.error
+            }))
+          }))
         };
         
         const newHistory = [historyEntry, ...testHistory].slice(0, 10); // Keep last 10 runs
@@ -236,6 +262,11 @@ const TestRunner = () => {
     }));
   };
 
+  // Toggle history item expansion
+  const toggleHistoryItemExpansion = (id) => {
+    setExpandedHistoryId(prevId => prevId === id ? null : id);
+  };
+
   // Clear test history
   const clearHistory = () => {
     setTestHistory([]);
@@ -249,6 +280,16 @@ const TestRunner = () => {
       return `${durationMs}ms`;
     } else {
       return `${(durationMs / 1000).toFixed(2)}s`;
+    }
+  };
+
+  // Format date for display in history
+  const formatDate = (dateStr) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleString();
+    } catch (e) {
+      return dateStr || 'Unknown date';
     }
   };
 
@@ -391,7 +432,7 @@ const TestRunner = () => {
                   <div className="suite-summary">
                     <span className="suite-count">{suite.tests.length} tests</span>
                     <span className="suite-passed">{suite.passed} passed</span>
-                    <span className="suite-failed">{suite.failed} failed</span>
+                    {suite.failed > 0 && <span className="suite-failed">{suite.failed} failed</span>}
                     <span className="suite-duration">{formatDuration(suite.totalDuration)}</span>
                   </div>
                 </div>
@@ -448,16 +489,84 @@ const TestRunner = () => {
           
           <div className="history-list">
             {testHistory.map((entry) => (
-              <div className="history-item" key={entry.id}>
-                <div className="history-timestamp">
-                  {new Date(entry.timestamp).toLocaleString()}
+              <div key={entry.id} className="history-entry">
+                <div 
+                  className={`history-item ${expandedHistoryId === entry.id ? 'expanded' : ''}`}
+                  onClick={() => toggleHistoryItemExpansion(entry.id)}
+                >
+                  <div className="history-item-header">
+                    <div className="history-timestamp">
+                      <i className={`fas fa-chevron-${expandedHistoryId === entry.id ? 'down' : 'right'} me-2`}></i>
+                      {formatDate(entry.timestamp)}
+                    </div>
+                    <div className="history-summary">
+                      <span className="history-total">{entry.summary.totalTests} tests</span>
+                      <span className="history-passed">{entry.summary.passed} passed</span>
+                      {entry.summary.failed > 0 && (
+                        <span className="history-failed">{entry.summary.failed} failed</span>
+                      )}
+                      <span className="history-duration">{formatDuration(entry.summary.duration)}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="history-summary">
-                  <span className="history-total">{entry.summary.totalTests} tests</span>
-                  <span className="history-passed">{entry.summary.passed} passed</span>
-                  <span className="history-failed">{entry.summary.failed} failed</span>
-                  <span className="history-duration">{formatDuration(entry.summary.duration)}</span>
-                </div>
+                
+                {/* Expanded history details */}
+                {expandedHistoryId === entry.id && (
+                  <div className="history-details">
+                    <div className="history-test-types">
+                      <strong>Test Types:</strong> 
+                      {entry.testTypes?.api ? 'API Tests' : ''} 
+                      {entry.testTypes?.api && entry.testTypes?.ui ? ' & ' : ''}
+                      {entry.testTypes?.ui ? 'UI Tests' : ''}
+                    </div>
+                    
+                    {entry.suites && entry.suites.length > 0 ? (
+                      <div className="history-suites">
+                        <h4>Suites Run</h4>
+                        {entry.suites.map((suite, index) => (
+                          <div className="history-suite" key={index}>
+                            <div className="history-suite-header">
+                              <span className="history-suite-name">{suite.name}</span>
+                              <div className="history-suite-summary">
+                                <span className="history-suite-passed">{suite.passed} passed</span>
+                                {suite.failed > 0 && (
+                                  <span className="history-suite-failed">{suite.failed} failed</span>
+                                )}
+                                <span className="history-suite-duration">{formatDuration(suite.duration)}</span>
+                              </div>
+                            </div>
+                            
+                            {/* List of tests in the suite */}
+                            <div className="history-suite-tests">
+                              {suite.tests?.map((test, testIndex) => (
+                                <div className={`history-test ${test.status}`} key={testIndex}>
+                                  <div className="history-test-status">
+                                    {test.status === 'passed' ? (
+                                      <i className="fas fa-check-circle"></i>
+                                    ) : test.status === 'failed' ? (
+                                      <i className="fas fa-times-circle"></i>
+                                    ) : (
+                                      <i className="fas fa-minus-circle"></i>
+                                    )}
+                                  </div>
+                                  <div className="history-test-name">{test.name}</div>
+                                  {test.error && (
+                                    <div className="history-test-error">{test.error}</div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="history-no-details">
+                        <i className="fas fa-info-circle me-2"></i>
+                        Detailed test information not available for this run
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
