@@ -3,6 +3,9 @@ import { runTests, TestConfig } from './testUtils';
 import { allApiTestSuites } from './tests/apiTests';
 import { allUiTestSuites } from './tests/uiTests';
 
+// Check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined' && window.document;
+
 /**
  * Main entry point for running all tests
  * @param {Object} options - Test run options
@@ -33,8 +36,10 @@ export const runAllTests = async (options = {}) => {
     suitesToRun.push(...allApiTestSuites);
   }
   
-  if (options.testType === 'ui' || !options.testType) {
+  if ((options.testType === 'ui' || !options.testType) && isBrowser) {
     suitesToRun.push(...allUiTestSuites);
+  } else if (options.testType === 'ui' && !isBrowser) {
+    console.warn('UI tests cannot be run in a non-browser environment');
   }
   
   // Run the tests
