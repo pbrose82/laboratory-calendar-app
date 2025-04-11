@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchTenant } from '../services/apiClient';
 import './ResourceViews.css';
@@ -11,12 +11,16 @@ function ResourceDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tenantName, setTenantName] = useState('');
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  
+  // Reference to track if component is mounted
+  const isMounted = useRef(true);
 
-  // Function to load tenant data - extracted for reuse with auto-refresh
-  const loadTenantData = async () => {
+  // Function to load tenant data - handles both initial load and background refresh
+  const loadTenantData = async (isInitialLoad = false) => {
     try {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       
       // Special handling for tenant name
       if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
@@ -26,51 +30,67 @@ function ResourceDashboard() {
       // Normal tenant handling from API
       const tenantData = await fetchTenant(tenantId);
       
-      if (tenantData) {
-        console.log('Loaded tenant data:', tenantData);
-        setResources(tenantData.resources || []);
+      if (tenantData && isMounted.current) {
+        // Get resources from API 
+        let resourcesList = [...(tenantData.resources || [])];
+        
+        // Add example Extruder equipment with maintenance status if not present
+        if (!resourcesList.some(r => r.title === 'Extruder')) {
+          resourcesList.push({
+            id: 'extruder-123',
+            title: 'Extruder',
+            maintenanceStatus: 'due', 
+            lastMaintenance: '2024-12-15',
+            nextMaintenance: '2025-04-15',
+            maintenanceInterval: '90 days'
+          });
+        }
+        
+        setResources(resourcesList);
         setEvents(tenantData.events || []);
         
         if (!tenantName) {
           setTenantName(tenantData.name || tenantId);
         }
-        
-        console.log('Data refreshed at', new Date().toLocaleTimeString());
-      } else {
-        setError(`Tenant "${tenantId}" not found`);
       }
     } catch (err) {
-      console.error('Failed to load tenant data:', err);
-      setError(`Error loading tenant data: ${err.message}`);
+      if (isMounted.current) {
+        console.error('Failed to load tenant data:', err);
+        setError(`Error loading tenant data: ${err.message}`);
+      }
     } finally {
-      setLoading(false);
+      if (isInitialLoad && isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
   // Initial data load
   useEffect(() => {
     if (tenantId) {
-      loadTenantData();
+      loadTenantData(true);
     }
-  }, [tenantId, tenantName]);
-  
-  // Auto-refresh setup
-  useEffect(() => {
-    let refreshInterval;
     
-    if (autoRefresh) {
-      // Refresh data every 30 seconds
-      refreshInterval = setInterval(() => {
-        console.log('Auto-refreshing resource dashboard data...');
-        loadTenantData();
-      }, 30000);
-    }
+    // Cleanup function
+    return () => {
+      isMounted.current = false;
+    };
+  }, [tenantId]);
+  
+  // Set up automatic background refresh
+  useEffect(() => {
+    // Refresh data every 30 seconds
+    const refreshInterval = setInterval(() => {
+      if (isMounted.current) {
+        loadTenantData(false);
+      }
+    }, 30000);
     
     // Clean up interval on component unmount
     return () => {
-      if (refreshInterval) clearInterval(refreshInterval);
+      clearInterval(refreshInterval);
     };
-  }, [autoRefresh, tenantId]);
+  }, [tenantId]);
 
   // Calculate resource utilization
   const calculateUtilization = (resourceId) => {
@@ -88,33 +108,69 @@ function ResourceDashboard() {
     );
     
     const eventsThisWeek = resourceEvents.filter(event => {
-      const eventStart = new Date(event.start);
-      return eventStart >= startOfWeek && eventStart < endOfWeek;
+      try {
+        const eventStart = new Date(event.start);
+        return eventStart >= startOfWeek && eventStart < endOfWeek;
+      } catch (e) {
+        return false;
+      }
     });
     
     return {
       total: resourceEvents.length,
       thisWeek: eventsThisWeek.length,
-      utilization: resourceEvents.length > 0 ? 
+      utilization: eventsThisWeek.length > 0 ? 
         Math.round((eventsThisWeek.length / 5) * 100) : 0 // Assuming 5 workdays per week
     };
   };
 
   // Get current equipment status
   const getResourceStatus = (resourceId) => {
+    const resource = resources.find(r => r.id === resourceId);
+    
+    // Check if equipment is marked for maintenance
+    if (resource?.maintenanceStatus === 'overdue') {
+      return 'maintenance-overdue';
+    } else if (resource?.maintenanceStatus === 'due') {
+      return 'maintenance-due';
+    }
+    
+    // Otherwise check if it's in use
     const now = new Date();
     
     const currentEvent = events.find(event => {
-      const eventStart = new Date(event.start);
-      const eventEnd = new Date(event.end);
-      return (
-        (event.resourceId === resourceId || 
-         event.equipment === resources.find(r => r.id === resourceId)?.title) &&
-        eventStart <= now && eventEnd >= now
-      );
+      try {
+        const eventStart = new Date(event.start);
+        const eventEnd = new Date(event.end);
+        return (
+          (event.resourceId === resourceId || 
+          event.equipment === resource?.title) &&
+          eventStart <= now && eventEnd >= now
+        );
+      } catch (e) {
+        return false;
+      }
     });
     
     return currentEvent ? 'in-use' : 'available';
+  };
+
+  // Format days remaining until maintenance
+  const getDaysUntilMaintenance = (nextMaintenanceDate) => {
+    if (!nextMaintenanceDate) return null;
+    
+    try {
+      const today = new Date();
+      const nextDate = new Date(nextMaintenanceDate);
+      
+      // Calculate difference in days
+      const diffTime = nextDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      return diffDays;
+    } catch (e) {
+      return null;
+    }
   };
 
   // Handle navigation to equipment calendar
@@ -138,30 +194,8 @@ function ResourceDashboard() {
       <div className="content-header">
         <h1>{getDisplayName()} - Resource Dashboard</h1>
         <div className="header-actions">
-          {/* Auto-refresh toggle */}
           <button 
-            className={`btn ${autoRefresh ? 'btn-primary' : 'btn-outline-primary'}`}
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            title={autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
-          >
-            <i className={`fas fa-${autoRefresh ? 'sync-alt fa-spin' : 'sync-alt'} me-1`}></i>
-            {autoRefresh ? "Auto" : "Manual"}
-          </button>
-          
-          {/* Manual refresh button - only show when auto is off */}
-          {!autoRefresh && (
-            <button 
-              className="btn btn-outline-secondary ms-2"
-              onClick={loadTenantData}
-              title="Refresh data"
-            >
-              <i className="fas fa-redo-alt me-1"></i>
-              Refresh
-            </button>
-          )}
-          
-          <button 
-            className="btn btn-outline-secondary ms-2"
+            className="btn btn-outline-primary"
             onClick={() => navigate(`/${tenantId}`)}
           >
             <i className="fas fa-calendar-alt me-1"></i>
@@ -178,9 +212,6 @@ function ResourceDashboard() {
         <div className="error-message">
           <h3>Error</h3>
           <p>{error}</p>
-          <button className="btn btn-primary mt-3" onClick={() => navigate('/')}>
-            Return to Main Dashboard
-          </button>
         </div>
       ) : (
         <div className="resource-dashboard">
@@ -222,9 +253,12 @@ function ResourceDashboard() {
                 <i className="fas fa-tools"></i>
               </div>
               <div className="summary-content">
-                <div className="summary-title">In Use Now</div>
+                <div className="summary-title">Maintenance Required</div>
                 <div className="summary-value">
-                  {resources.filter(r => getResourceStatus(r.id) === 'in-use').length}
+                  {resources.filter(r => 
+                    getResourceStatus(r.id) === 'maintenance-due' || 
+                    getResourceStatus(r.id) === 'maintenance-overdue'
+                  ).length}
                 </div>
               </div>
             </div>
@@ -241,13 +275,47 @@ function ResourceDashboard() {
               {resources.map(resource => {
                 const utilization = calculateUtilization(resource.id);
                 const status = getResourceStatus(resource.id);
+                const daysUntilMaintenance = resource.nextMaintenance ? 
+                  getDaysUntilMaintenance(resource.nextMaintenance) : null;
                 
                 return (
                   <div className="resource-card" key={resource.id}>
                     <div className={`resource-status ${status}`}>
-                      {status === 'available' ? 'Available' : 'In Use'}
+                      {status === 'available' ? 'Available' : 
+                       status === 'in-use' ? 'In Use' :
+                       status === 'maintenance-due' ? 'Maintenance Due' :
+                       status === 'maintenance-overdue' ? 'Maintenance Overdue' : 
+                       'Unknown'}
                     </div>
                     <h3 className="resource-title">{resource.title}</h3>
+                    
+                    {/* Show maintenance info if available */}
+                    {resource.maintenanceInterval && (
+                      <div className="maintenance-info">
+                        <div className="maintenance-label">
+                          <i className="fas fa-tools me-1"></i>
+                          Maintenance Interval: {resource.maintenanceInterval}
+                        </div>
+                        
+                        {resource.lastMaintenance && (
+                          <div className="maintenance-detail">
+                            Last: {new Date(resource.lastMaintenance).toLocaleDateString()}
+                          </div>
+                        )}
+                        
+                        {resource.nextMaintenance && daysUntilMaintenance !== null && (
+                          <div className="maintenance-detail">
+                            Next: {new Date(resource.nextMaintenance).toLocaleDateString()}
+                            <span className={`maintenance-days ${daysUntilMaintenance <= 0 ? 'overdue' : 'upcoming'}`}>
+                              {daysUntilMaintenance <= 0 ? 
+                                `(${Math.abs(daysUntilMaintenance)} days overdue)` : 
+                                `(in ${daysUntilMaintenance} days)`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
                     <div className="resource-utilization">
                       <div className="utilization-label">Weekly Utilization</div>
                       <div className="utilization-bar">
@@ -258,6 +326,7 @@ function ResourceDashboard() {
                       </div>
                       <div className="utilization-value">{utilization.utilization}%</div>
                     </div>
+                    
                     <div className="resource-stats">
                       <div className="resource-stat">
                         <div className="stat-label">Bookings (This Week)</div>
@@ -268,6 +337,7 @@ function ResourceDashboard() {
                         <div className="stat-value">{utilization.total}</div>
                       </div>
                     </div>
+                    
                     <div className="resource-actions">
                       <button 
                         className="resource-btn resource-btn-primary"

@@ -140,12 +140,12 @@ function TenantCalendar() {
   
   // Set up automatic background refresh
   useEffect(() => {
-    // Refresh data every 10 seconds
+    // Refresh data every 30 seconds
     const refreshInterval = setInterval(() => {
       if (isMounted.current) {
         handleReloadData(false);
       }
-    }, 10000);
+    }, 30000);
     
     // Clean up interval on component unmount
     return () => {
@@ -353,15 +353,6 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
           >
             <i className="fas fa-calendar-week me-1"></i>
             {showWeekends ? "Hide Weekends" : "Show Weekends"}
-          </button>
-          
-          {/* Back button */}
-          <button 
-            className="btn btn-outline-secondary ms-2"
-            onClick={() => navigate('/')}
-          >
-            <i className="fas fa-arrow-left me-1"></i>
-            Back
           </button>
           
           {/* Admin button if authenticated */}
