@@ -6,7 +6,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { fetchTenant, processCalendarEvent } from '../services/apiClient';
 import { demoTenantEvents, demoTenantResources } from '../data/sample-events';
-import { Card, Select, Button, Tag, Spin, Space, Alert, Typography, Divider, Row, Col } from 'antd';
+import { Card, Select, Button, Tag, Spin, Space, Alert, Typography, Divider, Row, Col, Statistic } from 'antd';
 import { CalendarOutlined, FilterOutlined, ReloadOutlined, CheckCircleOutlined, ExclamationOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import './TenantCalendar.css';
 
@@ -864,119 +864,5 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
     </div>
   );
 }
-
-// Add these styles to your CSS or in a style tag if needed
-const styles = `
-.tenant-calendar-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-.header-card {
-  margin-bottom: 16px;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.stats-row {
-  margin-bottom: 16px;
-}
-
-.stat-card {
-  height: 100%;
-}
-
-.stat-breakdown, .purpose-legend {
-  margin-top: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.filter-card {
-  margin-bottom: 16px;
-}
-
-.filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.filter-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.filter-item label {
-  font-size: 14px;
-  color: rgba(0, 0, 0, 0.65);
-}
-
-.filter-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 16px;
-}
-
-.filter-tag {
-  margin-left: 8px;
-}
-
-.purpose-legend {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.purpose-legend span:first-child {
-  color: rgba(0, 0, 0, 0.65);
-}
-
-.calendar-card {
-  margin-bottom: 16px;
-}
-
-.loading-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 400px;
-}
-
-@media (max-width: 768px) {
-  .filter-row {
-    flex-direction: column;
-    gap: 12px;
-  }
-  
-  .filter-item {
-    width: 100%;
-  }
-  
-  .header-content {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  
-  .header-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-}
-`;
 
 export default TenantCalendar;
