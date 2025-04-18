@@ -6,8 +6,8 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { fetchTenant, processCalendarEvent } from '../services/apiClient';
 import { demoTenantEvents, demoTenantResources } from '../data/sample-events';
-import { Card, Select, Button, Tag, Spin, Space, Alert, Typography, Divider, Row, Col, Statistic } from 'antd';
-import { CalendarOutlined, FilterOutlined, ReloadOutlined, CheckCircleOutlined, ExclamationOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { Card, Select, Button, Tag, Spin, Space, Alert, Typography } from 'antd';
+import { CalendarOutlined, ReloadOutlined, CheckCircleOutlined, ExclamationOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import './TenantCalendar.css';
 
 const { Option } = Select;
@@ -516,70 +516,9 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
     }
   };
 
-  // Generate status counts for statistics
-  const getStatusCounts = () => {
-    const now = new Date();
-    const counts = {
-      upcoming: 0,
-      ongoing: 0,
-      completed: 0
-    };
-    
-    events.forEach(event => {
-      try {
-        const startDate = new Date(event.start);
-        const endDate = new Date(event.end);
-        
-        if (startDate > now) {
-          counts.upcoming++;
-        } else if (startDate <= now && endDate >= now) {
-          counts.ongoing++;
-        } else if (endDate < now) {
-          counts.completed++;
-        }
-      } catch (e) {
-        console.warn('Error parsing event dates for counts:', e);
-      }
-    });
-    
-    return counts;
-  };
-  
-  // Generate purpose counts for statistics
-  const getPurposeCounts = () => {
-    const counts = {
-      utilization: 0,
-      maintenance: 0,
-      broken: 0
-    };
-    
-    events.forEach(event => {
-      const purpose = event.purpose || 
-                     (event.extendedProps && event.extendedProps.purpose) || 
-                     'Utilization';
-      
-      switch (purpose) {
-        case 'Maintenance':
-          counts.maintenance++;
-          break;
-        case 'Broken':
-          counts.broken++;
-          break;
-        case 'Utilization':
-        default:
-          counts.utilization++;
-          break;
-      }
-    });
-    
-    return counts;
-  };
-  
-  const statusCounts = getStatusCounts();
-  const purposeCounts = getPurposeCounts();
-
   return (
     <div className="tenant-calendar-container">
+      {/* Header */}
       <Card className="header-card">
         <div className="header-content">
           <Title level={3}>{getDisplayName()}</Title>
@@ -587,7 +526,6 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
             {isAdminAuthenticated && (
               <Button
                 type="default"
-                icon={<CalendarOutlined />}
                 onClick={() => navigate('/admin')}
               >
                 Admin Panel
@@ -626,47 +564,6 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
         </Card>
       ) : (
         <>
-          {/* Statistics Cards */}
-          <Row gutter={16} className="stats-row">
-            <Col xs={24} sm={8}>
-              <Card className="stat-card">
-                <Statistic
-                  title="Total Reservations"
-                  value={events.length}
-                  prefix={<CalendarOutlined />}
-                />
-                <div className="stat-breakdown">
-                  <span>Upcoming: {statusCounts.upcoming}</span>
-                  <span>Ongoing: {statusCounts.ongoing}</span>
-                  <span>Completed: {statusCounts.completed}</span>
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Card className="stat-card">
-                <Statistic
-                  title="Equipment"
-                  value={uniqueEquipment.length}
-                  suffix={`types / ${resources.length} total`}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Card className="stat-card">
-                <Statistic
-                  title="Purpose Breakdown"
-                  value={purposeCounts.utilization}
-                  suffix={`/ ${events.length}`}
-                />
-                <div className="purpose-legend">
-                  <Tag color="blue" icon={<CheckCircleOutlined />}>Utilization: {purposeCounts.utilization}</Tag>
-                  <Tag color="gold" icon={<ExclamationOutlined />}>Maintenance: {purposeCounts.maintenance}</Tag>
-                  <Tag color="red" icon={<CloseCircleOutlined />}>Broken: {purposeCounts.broken}</Tag>
-                </div>
-              </Card>
-            </Col>
-          </Row>
-
           {/* Filter Panel */}
           <Card className="filter-card">
             <Space direction="vertical" style={{ width: '100%' }}>
@@ -726,10 +623,8 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
                     <Option value="completed">Completed</Option>
                   </Select>
                 </div>
-              </div>
-              
-              <div className="filter-actions">
-                <Space>
+                
+                <div className="filter-actions">
                   <Button 
                     icon={<ReloadOutlined />} 
                     onClick={resetFilters}
@@ -738,13 +633,11 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
                   </Button>
                   
                   <Button 
-                    type={showWeekends ? "default" : "primary"}
-                    icon={<CalendarOutlined />}
                     onClick={toggleWeekends}
                   >
                     {showWeekends ? "Hide Weekends" : "Show Weekends"}
                   </Button>
-                </Space>
+                </div>
               </div>
               
               {/* Filter summary */}
