@@ -116,17 +116,63 @@ function ResourceDashboard() {
       }
     });
     
+    // Calculate event counts by purpose
+    const utilizationEvents = resourceEvents.filter(event => 
+      (event.purpose || 'Utilization') === 'Utilization');
+    const maintenanceEvents = resourceEvents.filter(event => 
+      event.purpose === 'Maintenance');
+    const brokenEvents = resourceEvents.filter(event => 
+      event.purpose === 'Broken');
+    
     return {
       total: resourceEvents.length,
       thisWeek: eventsThisWeek.length,
       utilization: eventsThisWeek.length > 0 ? 
-        Math.round((eventsThisWeek.length / 5) * 100) : 0 // Assuming 5 workdays per week
+        Math.round((eventsThisWeek.length / 5) * 100) : 0, // Assuming 5 workdays per week
+      utilizationEvents: utilizationEvents.length,
+      maintenanceEvents: maintenanceEvents.length,
+      brokenEvents: brokenEvents.length,
+      totalCost: resourceEvents.reduce((sum, event) => sum + (Number(event.cost) || 0), 0)
     };
   };
 
   // Get current equipment status
   const getResourceStatus = (resourceId) => {
     const resource = resources.find(r => r.id === resourceId);
+    
+    // First check purpose from recent events
+    const recentEvents = events
+      .filter(event => 
+        event.resourceId === resourceId || 
+        event.equipment === resource?.title
+      )
+      .sort((a, b) => new Date(b.start) - new Date(a.start)); // Most recent first
+    
+    // If we have a recent "Broken" event, the equipment is broken
+    if (recentEvents.some(event => event.purpose === 'Broken')) {
+      return 'broken';
+    }
+    
+    // Check if there's an active maintenance event
+    const now = new Date();
+    const currentEvent = events.find(event => {
+      try {
+        const eventStart = new Date(event.start);
+        const eventEnd = new Date(event.end);
+        return (
+          (event.resourceId === resourceId || 
+           event.equipment === resource?.title) &&
+          eventStart <= now && eventEnd >= now && 
+          event.purpose === 'Maintenance'
+        );
+      } catch (e) {
+        return false;
+      }
+    });
+    
+    if (currentEvent) {
+      return 'maintenance';
+    }
     
     // Check if equipment is marked for maintenance
     if (resource?.maintenanceStatus === 'overdue') {
@@ -136,15 +182,13 @@ function ResourceDashboard() {
     }
     
     // Otherwise check if it's in use
-    const now = new Date();
-    
-    const currentEvent = events.find(event => {
+    const inUseEvent = events.find(event => {
       try {
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
         return (
           (event.resourceId === resourceId || 
-          event.equipment === resource?.title) &&
+           event.equipment === resource?.title) &&
           eventStart <= now && eventEnd >= now
         );
       } catch (e) {
@@ -152,10 +196,10 @@ function ResourceDashboard() {
       }
     });
     
-    return currentEvent ? 'in-use' : 'available';
+    return inUseEvent ? 'in-use' : 'available';
   };
 
-  // Format days remaining until maintenance
+  // Get days until maintenance
   const getDaysUntilMaintenance = (nextMaintenanceDate) => {
     if (!nextMaintenanceDate) return null;
     
@@ -187,6 +231,16 @@ function ResourceDashboard() {
     } else {
       return tenantName || tenantId;
     }
+  };
+
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
   };
 
   return (
@@ -237,7 +291,7 @@ function ResourceDashboard() {
             </div>
             
             <div className="summary-card">
-              <div className="summary-icon">
+              <div className="summary-icon status-icon-available">
                 <i className="fas fa-clock"></i>
               </div>
               <div className="summary-content">
@@ -249,18 +303,37 @@ function ResourceDashboard() {
             </div>
             
             <div className="summary-card">
-              <div className="summary-icon">
-                <i className="fas fa-tools"></i>
+              <div className="summary-icon status-icon-broken">
+                <i className="fas fa-exclamation-triangle"></i>
               </div>
               <div className="summary-content">
-                <div className="summary-title">Maintenance Required</div>
+                <div className="summary-title">Out of Service</div>
                 <div className="summary-value">
                   {resources.filter(r => 
-                    getResourceStatus(r.id) === 'maintenance-due' || 
-                    getResourceStatus(r.id) === 'maintenance-overdue'
+                    ['broken', 'maintenance', 'maintenance-due', 'maintenance-overdue']
+                      .includes(getResourceStatus(r.id))
                   ).length}
                 </div>
               </div>
+            </div>
+          </div>
+          
+          <div className="status-legend">
+            <div className="legend-item">
+              <span className="status-dot available"></span>
+              <span>Available</span>
+            </div>
+            <div className="legend-item">
+              <span className="status-dot in-use"></span>
+              <span>In Use</span>
+            </div>
+            <div className="legend-item">
+              <span className="status-dot maintenance"></span>
+              <span>Maintenance</span>
+            </div>
+            <div className="legend-item">
+              <span className="status-dot broken"></span>
+              <span>Broken</span>
             </div>
           </div>
           
@@ -279,42 +352,60 @@ function ResourceDashboard() {
                   getDaysUntilMaintenance(resource.nextMaintenance) : null;
                 
                 return (
-                  <div className="resource-card" key={resource.id}>
-                    <div className={`resource-status ${status}`}>
-                      {status === 'available' ? 'Available' : 
-                       status === 'in-use' ? 'In Use' :
-                       status === 'maintenance-due' ? 'Maintenance Due' :
-                       status === 'maintenance-overdue' ? 'Maintenance Overdue' : 
-                       'Unknown'}
+                  <div className={`resource-card status-${status}`} key={resource.id}>
+                    <div className={`resource-status-indicator status-${status}`}>
+                      <i className={
+                        status === 'available' ? 'fas fa-check-circle' : 
+                        status === 'in-use' ? 'fas fa-play-circle' :
+                        status === 'maintenance' || status === 'maintenance-due' ? 'fas fa-tools' :
+                        status === 'maintenance-overdue' ? 'fas fa-exclamation-triangle' :
+                        status === 'broken' ? 'fas fa-ban' : 'fas fa-question-circle'
+                      }></i>
                     </div>
                     <h3 className="resource-title">{resource.title}</h3>
                     
-                    {/* Show maintenance info if available */}
-                    {resource.maintenanceInterval && (
-                      <div className="maintenance-info">
-                        <div className="maintenance-label">
-                          <i className="fas fa-tools me-1"></i>
-                          Maintenance Interval: {resource.maintenanceInterval}
-                        </div>
-                        
-                        {resource.lastMaintenance && (
-                          <div className="maintenance-detail">
-                            Last: {new Date(resource.lastMaintenance).toLocaleDateString()}
-                          </div>
+                    <div className="resource-status-label status-label-${status}">
+                      {status === 'available' ? 'Available' : 
+                       status === 'in-use' ? 'In Use' :
+                       status === 'maintenance' ? 'Under Maintenance' :
+                       status === 'maintenance-due' ? 'Maintenance Due' :
+                       status === 'maintenance-overdue' ? 'Maintenance Overdue' : 
+                       status === 'broken' ? 'Out of Service' :
+                       'Unknown Status'}
+                    </div>
+                    
+                    {/* Purpose breakdown */}
+                    <div className="resource-purpose-chart">
+                      <div className="purpose-label">Event Breakdown:</div>
+                      <div className="purpose-bars">
+                        {utilization.utilizationEvents > 0 && (
+                          <div 
+                            className="purpose-bar utilization" 
+                            style={{width: `${(utilization.utilizationEvents / utilization.total) * 100}%`}}
+                            title={`${utilization.utilizationEvents} Utilization events`}
+                          ></div>
                         )}
-                        
-                        {resource.nextMaintenance && daysUntilMaintenance !== null && (
-                          <div className="maintenance-detail">
-                            Next: {new Date(resource.nextMaintenance).toLocaleDateString()}
-                            <span className={`maintenance-days ${daysUntilMaintenance <= 0 ? 'overdue' : 'upcoming'}`}>
-                              {daysUntilMaintenance <= 0 ? 
-                                `(${Math.abs(daysUntilMaintenance)} days overdue)` : 
-                                `(in ${daysUntilMaintenance} days)`}
-                            </span>
-                          </div>
+                        {utilization.maintenanceEvents > 0 && (
+                          <div 
+                            className="purpose-bar maintenance" 
+                            style={{width: `${(utilization.maintenanceEvents / utilization.total) * 100}%`}}
+                            title={`${utilization.maintenanceEvents} Maintenance events`}
+                          ></div>
+                        )}
+                        {utilization.brokenEvents > 0 && (
+                          <div 
+                            className="purpose-bar broken" 
+                            style={{width: `${(utilization.brokenEvents / utilization.total) * 100}%`}}
+                            title={`${utilization.brokenEvents} Broken events`}
+                          ></div>
                         )}
                       </div>
-                    )}
+                      <div className="purpose-counts">
+                        <span className="purpose-count utilization">{utilization.utilizationEvents}</span>
+                        <span className="purpose-count maintenance">{utilization.maintenanceEvents}</span>
+                        <span className="purpose-count broken">{utilization.brokenEvents}</span>
+                      </div>
+                    </div>
                     
                     <div className="resource-utilization">
                       <div className="utilization-label">Weekly Utilization</div>
@@ -333,8 +424,8 @@ function ResourceDashboard() {
                         <div className="stat-value">{utilization.thisWeek}</div>
                       </div>
                       <div className="resource-stat">
-                        <div className="stat-label">Total Bookings</div>
-                        <div className="stat-value">{utilization.total}</div>
+                        <div className="stat-label">Total Cost</div>
+                        <div className="stat-value cost">{formatCurrency(utilization.totalCost)}</div>
                       </div>
                     </div>
                     
