@@ -1525,3 +1525,148 @@ function Analytics() {
       sorter: (a, b) => a.costPerHour - b.costPerHour,
     },
   ];
+// Export menu 
+  const exportMenu = (
+    <Menu>
+      <Menu.Item key="csv-equipment" onClick={exportEquipmentCSV}>
+        <FileExcelOutlined /> Equipment Utilization
+      </Menu.Item>
+      <Menu.Item key="csv-technicians" onClick={exportTechnicianCSV}>
+        <FileExcelOutlined /> Technician Data
+      </Menu.Item>
+      <Menu.Item key="csv-monthly" onClick={exportMonthlyCSV}>
+        <FileExcelOutlined /> Monthly Trends
+      </Menu.Item>
+      <Menu.Item key="csv-events" onClick={exportEventsCSV}>
+        <FileExcelOutlined /> Event Data
+      </Menu.Item>
+      <Menu.Divider />
+      <Menu.Item key="csv-roi" onClick={exportROIData}>
+        <FileExcelOutlined /> ROI Analysis
+      </Menu.Item>
+      <Menu.Item key="csv-departments" onClick={exportDepartmentData}>
+        <FileExcelOutlined /> Department Comparison
+      </Menu.Item>
+      <Menu.Item key="csv-recommendations" onClick={exportRecommendationsData}>
+        <FileExcelOutlined /> Optimization Recommendations
+      </Menu.Item>
+      <Menu.Divider />
+      <Menu.Item key="csv-all" onClick={exportFullReport}>
+        <FileExcelOutlined /> Export All Data
+      </Menu.Item>
+    </Menu>
+  );
+
+  // Export full analytics report to CSV
+  const exportFullReport = () => {
+    // Create a zip file with all reports
+    // For simplicity, we'll just export all data separately
+    exportEquipmentCSV();
+    setTimeout(() => exportTechnicianCSV(), 500);
+    setTimeout(() => exportMonthlyCSV(), 1000);
+    setTimeout(() => exportEventsCSV(), 1500);
+    setTimeout(() => exportROIData(), 2000);
+    setTimeout(() => exportDepartmentData(), 2500);
+    setTimeout(() => exportRecommendationsData(), 3000);
+  };
+
+  return (
+    <div className="analytics-container">
+      <Card className="header-card">
+        <div className="header-content">
+          <Title level={3}>{getDisplayName()} - Equipment Utilization Report</Title>
+          <div className="header-actions">
+            <Dropdown overlay={exportMenu} placement="bottomRight">
+              <Button icon={<DownloadOutlined />}>
+                Export Reports
+              </Button>
+            </Dropdown>
+            <Button 
+              type="primary"
+              icon={<CalendarOutlined />}
+              onClick={() => navigate(`/${tenantId}`)}
+            >
+              Calendar View
+            </Button>
+          </div>
+        </div>
+      </Card>
+      
+      <Card className="filter-card">
+        <div className="date-range-picker">
+          <Text strong>Report Time Period:</Text>
+          <Select 
+            value={timeRange}
+            onChange={(value) => {
+              setTimeRange(value);
+              if (value === 'custom') {
+                // If 'custom' is selected, default to last 30 days custom range
+                const end = new Date();
+                const start = new Date();
+                start.setDate(start.getDate() - 30);
+                setCustomDateRange([start, end]);
+              }
+            }}
+            style={{ width: 170 }}
+          >
+            <Option value="7days">Last 7 Days</Option>
+            <Option value="30days">Last 30 Days</Option>
+            <Option value="90days">Last 90 Days</Option>
+            <Option value="12months">Last 12 Months</Option>
+            <Option value="custom">Custom Range</Option>
+          </Select>
+          
+          {timeRange === 'custom' && (
+            <RangePicker 
+              value={customDateRange}
+              onChange={(dates) => setCustomDateRange(dates)}
+              style={{ marginLeft: 16 }}
+            />
+          )}
+        </div>
+      </Card>
+      
+      {loading ? (
+        <Card>
+          <div className="loading-container">
+            <Spin size="large" tip="Loading analytics data..." />
+          </div>
+        </Card>
+      ) : error ? (
+        <Card>
+          <Alert
+            message="Error Loading Analytics"
+            description={error}
+            type="error"
+            showIcon
+            action={
+              <Button onClick={() => navigate('/')} type="primary">
+                Return to Main Dashboard
+              </Button>
+            }
+          />
+        </Card>
+      ) : (
+        <div className="analytics-content">
+          {/* Tabbed Reports Interface */}
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            type="card"
+            className="report-tabs"
+            tabBarExtraContent={
+              <Tooltip title="All metrics update automatically based on the selected time period">
+                <InfoCircleOutlined style={{ marginRight: 16 }} />
+              </Tooltip>
+            }
+          >
+            {/* Tab content goes here - all your tab panes */}
+            {/* Since this is where the component was cut off, you would need to add all your TabPane components here */}
+          </Tabs>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default Analytics;
