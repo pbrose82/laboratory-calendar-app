@@ -50,17 +50,7 @@ function EquipmentList() {
         // Get resources from API 
         let resourcesList = [...(tenantData.resources || [])];
         
-        // Add example Extruder equipment with maintenance status if not present
-        if (!resourcesList.some(r => r.title === 'Extruder')) {
-          resourcesList.push({
-            id: 'extruder-123',
-            title: 'Extruder',
-            maintenanceStatus: 'due', 
-            lastMaintenance: '2024-12-15',
-            nextMaintenance: '2025-04-15',
-            maintenanceInterval: '90 days'
-          });
-        }
+      setResources(tenantData.resources || []);
         
         setResources(resourcesList);
         setEvents(tenantData.events || []);
