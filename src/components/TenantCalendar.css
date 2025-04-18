@@ -1,18 +1,90 @@
-# Modern Stylesheet Implementation
-
-To complement the enhanced React components, here's a comprehensive CSS stylesheet that you can add to your project. This will create a cohesive visual design across both the Calendar and Analytics pages.
-
-## Main Stylesheet (styles.css)
-
-```css
 /* ==========================================================================
-   Base Styles and Resets
+   Base Styles and Variables
    ========================================================================== */
 
+:root {
+  /* Color Variables */
+  --blue-primary: #4285F4;
+  --blue-dark: #3367d6;
+  --blue-light: #adc6ff;
+  --yellow-primary: #FBBC05;
+  --yellow-dark: #f09705;
+  --yellow-light: #fde293;
+  --red-primary: #EA4335;
+  --red-dark: #d62516;
+  --red-light: #f5aca6;
+  --green-primary: #34A853;
+  --green-dark: #2d904a;
+  --green-light: #a3e0b5;
+  
+  /* Neutral Colors */
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  
+  /* Spacing */
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  
+  /* Border Radius */
+  --radius-sm: 0.125rem;
+  --radius: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  
+  /* Font Sizes */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+  
+  /* Font Weights */
+  --font-light: 300;
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+}
+
+/* Base Reset */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  color: var(--gray-800);
+  background-color: var(--gray-50);
+  line-height: 1.5;
+  font-size: var(--text-base);
 }
 
 /* ==========================================================================
@@ -172,7 +244,7 @@ To complement the enhanced React components, here's a comprehensive CSS styleshe
   border: 1px solid var(--gray-300);
   border-radius: var(--radius);
   font-size: var(--text-sm);
-  min-width: 200px;
+  min-width: 180px;
 }
 
 .filter-select:focus {
@@ -242,10 +314,7 @@ To complement the enhanced React components, here's a comprehensive CSS styleshe
   background-color: var(--gray-100);
 }
 
-/* ==========================================================================
-   Calendar Specific Styles
-   ========================================================================== */
-
+/* Calendar Styles */
 .laboratory-calendar {
   background: white;
   border-radius: var(--radius-lg);
@@ -254,7 +323,39 @@ To complement the enhanced React components, here's a comprehensive CSS styleshe
   margin-bottom: var(--spacing-6);
 }
 
-/* Event color coding based on purpose */
+/* Filter key - legend for color codes */
+.filter-key {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+.key-item {
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.key-color {
+  width: 12px;
+  height: 12px;
+  margin-right: 5px;
+  border-radius: 2px;
+}
+
+.key-color.utilization {
+  background-color: var(--blue-primary);
+}
+
+.key-color.maintenance {
+  background-color: var(--yellow-primary);
+}
+
+.key-color.broken {
+  background-color: var(--red-primary);
+}
+
+/* Calendar Event Purpose-Based Styling */
 .event-utilization {
   background-color: var(--blue-primary) !important;
   border-color: var(--blue-dark) !important;
@@ -269,6 +370,30 @@ To complement the enhanced React components, here's a comprehensive CSS styleshe
 .event-broken {
   background-color: var(--red-primary) !important;
   border-color: var(--red-dark) !important;
+}
+
+/* Hover effects for purpose-based events */
+.event-utilization:hover {
+  background-color: var(--blue-dark) !important;
+}
+
+.event-maintenance:hover {
+  background-color: var(--yellow-dark) !important;
+}
+
+.event-broken:hover {
+  background-color: var(--red-dark) !important;
+}
+
+/* Cost badge - for displaying cost in calendar events */
+.fc-event .cost-badge {
+  font-size: 0.7em;
+  background: rgba(0,0,0,0.2);
+  border-radius: 3px;
+  padding: 1px 3px;
+  margin-left: 3px;
+  white-space: nowrap;
+  display: inline-block;
 }
 
 /* Purpose badges */
@@ -390,7 +515,7 @@ To complement the enhanced React components, here's a comprehensive CSS styleshe
 /* Purpose breakdown */
 .purpose-breakdown {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr;
   gap: var(--spacing-6);
 }
 
@@ -466,6 +591,32 @@ To complement the enhanced React components, here's a comprehensive CSS styleshe
   color: var(--gray-700);
 }
 
+/* Text alignment and spacing utilities */
+.text-center {
+  text-align: center;
+}
+
+.py-4 {
+  padding-top: var(--spacing-4);
+  padding-bottom: var(--spacing-4);
+}
+
+.mt-3 {
+  margin-top: var(--spacing-3);
+}
+
+.mb-4 {
+  margin-bottom: var(--spacing-4);
+}
+
+.me-1 {
+  margin-right: var(--spacing-1);
+}
+
+.me-2 {
+  margin-right: var(--spacing-2);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .stat-cards {
@@ -485,126 +636,8 @@ To complement the enhanced React components, here's a comprehensive CSS styleshe
     align-items: flex-start;
     gap: var(--spacing-4);
   }
-}
-```
-
-## How to Use This Stylesheet
-
-To implement this stylesheet in your project:
-
-1. Create a new file called `modernStyles.css` in your project's `src/styles/` directory
-2. Copy and paste the CSS code above into this file
-3. Import the stylesheet in your main application file:
-
-```javascript
-import './styles/modernStyles.css';
-```
-
-4. Apply the class names shown in the CSS to your React components
-
-### Key Features
-
-This modern stylesheet provides:
-
-1. **Consistent design system** with CSS variables for colors, spacing, shadows, and typography
-2. **Responsive layouts** that work well on all device sizes
-3. **Modern look and feel** with appropriate spacing, shadows, and rounded corners
-4. **Purpose-specific styling** for utilization, maintenance, and broken/repair events
-5. **Interactive elements** with hover states and transitions for buttons and tables
-6. **Data visualization styles** for charts, utilization bars, and breakdown displays
-
-### Design Principles Used
-
-- **Visual hierarchy** to emphasize important information
-- **Color coding** for easy identification of event types
-- **Whitespace** for improved readability and focus
-- **Consistency** across all UI elements
-- **Accessibility** with appropriate contrast ratios
-- **Responsiveness** to ensure usability on all devices
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  color: var(--gray-800);
-  background-color: var(--gray-50);
-  line-height: 1.5;
-  font-size: var(--text-base);
-}
-
-:root {
-  /* Color Variables */
-  --blue-primary: #4285F4;
-  --blue-dark: #3367d6;
-  --blue-light: #adc6ff;
-  --yellow-primary: #FBBC05;
-  --yellow-dark: #f09705;
-  --yellow-light: #fde293;
-  --red-primary: #EA4335;
-  --red-dark: #d62516;
-  --red-light: #f5aca6;
-  --green-primary: #34A853;
-  --green-dark: #2d904a;
-  --green-light: #a3e0b5;
   
-  /* Neutral Colors */
-  --gray-50: #f9fafb;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
-  
-  /* Spacing */
-  --spacing-1: 0.25rem;
-  --spacing-2: 0.5rem;
-  --spacing-3: 0.75rem;
-  --spacing-4: 1rem;
-  --spacing-6: 1.5rem;
-  --spacing-8: 2rem;
-  --spacing-12: 3rem;
-  --spacing-16: 4rem;
-  
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  
-  /* Border Radius */
-  --radius-sm: 0.125rem;
-  --radius: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
-  --radius-2xl: 1rem;
-  
-  /* Font Sizes */
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
-  --text-3xl: 1.875rem;
-  --text-4xl: 2.25rem;
-  --text-5xl: 3rem;
-  
-  /* Font Weights */
-  --font-light: 300;
-  --font-normal: 400;
-  --font-medium: 500;
-  --font-semibold: 600;
-  --font-bold: 700;
-  
-  /* Z-index */
-  --z-0: 0;
-  --z-10: 10;
-  --z-20: 20;
-  --z-30: 30;
-  --z-40: 40;
-  --z-50: 50;
-  --z-auto: auto;
+  .breakdown-bar {
+    grid-template-columns: 80px 1fr 60px;
+  }
 }
