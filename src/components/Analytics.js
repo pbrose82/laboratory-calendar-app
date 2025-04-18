@@ -1,97 +1,62 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  Card, Row, Col, Select, Button, Typography, Spin, Alert, 
+  Table, Statistic, Tag, Space, Divider, Progress
+} from 'antd';
+import {
+  BarChartOutlined, PieChartOutlined, CalendarOutlined, DollarOutlined,
+  CheckCircleOutlined, ExclamationOutlined, CloseCircleOutlined
+} from '@ant-design/icons';
+import { fetchTenant } from '../services/apiClient';
+import './Analytics.css';
+
+const { Option } = Select;
+const { Title, Text } = Typography;
 
 function Analytics() {
+  const { tenantId } = useParams();
+  const navigate = useNavigate();
   const [resources, setResources] = useState([]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [tenantName, setTenantName] = useState('Laboratory Equipment');
+  const [tenantName, setTenantName] = useState('');
+  
+  // Time range for analytics (default: last 30 days)
   const [timeRange, setTimeRange] = useState('30days');
+  
+  // Ref to track if component is mounted
   const isMounted = useRef(true);
 
-  // Function to load tenant data
+  // Function to load tenant data - handles both initial load and background refresh
   const loadTenantData = async (isInitialLoad = false) => {
     try {
       if (isInitialLoad) {
         setLoading(true);
       }
-
-      // This would be your API call in a real implementation
-      setTimeout(() => {
-        // Sample data for demonstration
-        const sampleResources = [
-          { id: 'equipment-1', title: 'HPLC Agilent 1260' },
-          { id: 'equipment-2', title: 'Mass Spec AB Sciex' },
-          { id: 'equipment-3', title: 'NMR Bruker 400MHz' },
-          { id: 'equipment-4', title: 'PCR Thermal Cycler' },
-          { id: 'equipment-5', title: 'Microplate Reader' }
-        ];
-
-        const sampleEvents = [
-          {
-            id: '1',
-            title: 'HPLC Analysis',
-            start: new Date(2025, 3, 15, 9, 0),
-            end: new Date(2025, 3, 15, 12, 0),
-            resourceId: 'equipment-1',
-            equipment: 'HPLC Agilent 1260',
-            technician: 'John Smith',
-            purpose: 'Utilization',
-            cost: 350
-          },
-          {
-            id: '2',
-            title: 'Mass Spec Maintenance',
-            start: new Date(2025, 3, 16, 13, 0),
-            end: new Date(2025, 3, 16, 16, 0),
-            resourceId: 'equipment-2',
-            equipment: 'Mass Spec AB Sciex',
-            technician: 'Maria Johnson',
-            purpose: 'Maintenance',
-            cost: 650
-          },
-          {
-            id: '3',
-            title: 'NMR Repair',
-            start: new Date(2025, 3, 17, 10, 0),
-            end: new Date(2025, 3, 17, 15, 0),
-            resourceId: 'equipment-3',
-            equipment: 'NMR Bruker 400MHz',
-            technician: 'David Williams',
-            purpose: 'Broken',
-            cost: 1250
-          },
-          {
-            id: '4',
-            title: 'PCR Analysis',
-            start: new Date(2025, 3, 18, 9, 0),
-            end: new Date(2025, 3, 18, 11, 0),
-            resourceId: 'equipment-4',
-            equipment: 'PCR Thermal Cycler',
-            technician: 'John Smith',
-            purpose: 'Utilization',
-            cost: 280
-          },
-          {
-            id: '5',
-            title: 'Microplate Reading',
-            start: new Date(2025, 3, 19, 14, 0),
-            end: new Date(2025, 3, 19, 16, 0),
-            resourceId: 'equipment-5',
-            equipment: 'Microplate Reader',
-            technician: 'Lisa Brown',
-            purpose: 'Utilization',
-            cost: 190
-          }
-        ];
-
-        setResources(sampleResources);
-        setEvents(sampleEvents);
-
-        if (isInitialLoad) {
-          setLoading(false);
+      
+      // Special handling for tenant name
+      if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
+        setTenantName('Product CASE UAT');
+      }
+      
+      // Normal tenant handling from API
+      const tenantData = await fetchTenant(tenantId);
+      
+      if (tenantData && isMounted.current) {
+        console.log('Analytics - setting resources and events');
+        setResources(tenantData.resources || []);
+        setEvents(tenantData.events || []);
+        
+        if (!tenantName) {
+          setTenantName(tenantData.name || tenantId);
         }
-      }, 1000);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Analytics data refreshed at', new Date().toLocaleTimeString());
+        }
+      }
     } catch (err) {
       if (isMounted.current) {
         console.error('Failed to load tenant data:', err);
@@ -106,13 +71,31 @@ function Analytics() {
 
   // Initial data load
   useEffect(() => {
-    loadTenantData(true);
+    if (tenantId) {
+      loadTenantData(true);
+    }
     
     // Cleanup function
     return () => {
       isMounted.current = false;
     };
-  }, []);
+  }, [tenantId]);
+  
+  // Set up automatic background refresh - using 30 seconds interval for consistency
+  useEffect(() => {
+    // Refresh data every 30 seconds
+    const refreshInterval = setInterval(() => {
+      if (isMounted.current) {
+        console.log('Analytics - triggering background refresh');
+        loadTenantData(false);
+      }
+    }, 30000);
+    
+    // Clean up interval on component unmount
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [tenantId]);
 
   // Get events within the selected time range
   const getFilteredEvents = () => {
@@ -219,10 +202,7 @@ function Analytics() {
         utilization: 0,
         maintenance: 0,
         broken: 0,
-        total: 0,
-        utilizationPercent: 0,
-        maintenancePercent: 0,
-        brokenPercent: 0
+        total: 0
       };
     }
     
@@ -395,6 +375,17 @@ function Analytics() {
     }
   };
 
+  // Format display name for tenant
+  const getDisplayName = () => {
+    if (tenantId === 'demo-tenant') {
+      return 'Demo Tenant';
+    } else if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
+      return 'Product CASE UAT';
+    } else {
+      return tenantName || tenantId;
+    }
+  };
+
   // Format currency for display
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
@@ -405,6 +396,19 @@ function Analytics() {
     }).format(amount);
   };
 
+  // Get purpose tag
+  const getPurposeTag = (purpose) => {
+    switch(purpose) {
+      case 'Maintenance':
+        return <Tag color="gold" icon={<ExclamationOutlined />}>Maintenance</Tag>;
+      case 'Broken':
+        return <Tag color="red" icon={<CloseCircleOutlined />}>Broken</Tag>;
+      default:
+        return <Tag color="blue" icon={<CheckCircleOutlined />}>Utilization</Tag>;
+    }
+  };
+
+  // Calculate data for analytics
   const metrics = calculateMetrics();
   const equipmentUtilization = calculateEquipmentUtilization();
   const topTechnicians = getTopTechnicians();
@@ -412,300 +416,418 @@ function Analytics() {
   const purposeBreakdown = calculatePurposeBreakdown();
   const costMetrics = calculateCostMetrics();
 
-  // Custom Chart for Purpose Breakdown
-  const PurposeBreakdownChart = ({ data }) => {
-    if (!data) return null;
-    
-    return (
-      <div className="purpose-breakdown-chart">
-        <div className="breakdown-bars">
-          <div className="breakdown-bar">
-            <div className="bar-label">Utilization</div>
-            <div className="bar-container">
-              <div className="bar-fill utilization" style={{ width: `${data.utilizationPercent}%` }}>
-                {data.utilizationPercent}%
-              </div>
-            </div>
-            <div className="bar-count">{data.utilization} events</div>
-          </div>
-          
-          <div className="breakdown-bar">
-            <div className="bar-label">Maintenance</div>
-            <div className="bar-container">
-              <div className="bar-fill maintenance" style={{ width: `${data.maintenancePercent}%` }}>
-                {data.maintenancePercent}%
-              </div>
-            </div>
-            <div className="bar-count">{data.maintenance} events</div>
-          </div>
-          
-          <div className="breakdown-bar">
-            <div className="bar-label">Broken</div>
-            <div className="bar-container">
-              <div className="bar-fill broken" style={{ width: `${data.brokenPercent}%` }}>
-                {data.brokenPercent}%
-              </div>
-            </div>
-            <div className="bar-count">{data.broken} events</div>
-          </div>
+  // Table columns for Equipment Utilization
+  const equipmentColumns = [
+    {
+      title: 'Equipment',
+      dataIndex: 'name',
+      key: 'name',
+      sorter: (a, b) => a.name.localeCompare(b.name),
+    },
+    {
+      title: 'Total Events',
+      dataIndex: 'count',
+      key: 'count',
+      sorter: (a, b) => a.count - b.count,
+    },
+    {
+      title: 'Utilization %',
+      key: 'utilization',
+      render: (_, record) => (
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <Progress 
+            percent={record.utilization} 
+            size="small" 
+            style={{ width: 120, marginRight: 12 }}
+          />
+          <span>{record.utilization}%</span>
         </div>
-      </div>
-    );
-  };
+      ),
+      sorter: (a, b) => a.utilization - b.utilization,
+    },
+    {
+      title: 'Total Cost',
+      key: 'totalCost',
+      render: (_, record) => formatCurrency(record.totalCost),
+      sorter: (a, b) => a.totalCost - b.totalCost,
+    },
+    {
+      title: 'Avg Cost/Event',
+      key: 'avgCost',
+      render: (_, record) => formatCurrency(record.avgCost),
+      sorter: (a, b) => a.avgCost - b.avgCost,
+    },
+    {
+      title: 'Purpose Breakdown',
+      key: 'purposeBreakdown',
+      render: (_, record) => {
+        const total = record.count || 1; // Avoid division by zero
+        return (
+          <div>
+            <div className="purpose-mini-chart">
+              <div className="mini-bar utilization" style={{ width: `${(record.utilizationCount / total) * 100}%` }}></div>
+              <div className="mini-bar maintenance" style={{ width: `${(record.maintenanceCount / total) * 100}%` }}></div>
+              <div className="mini-bar broken" style={{ width: `${(record.brokenCount / total) * 100}%` }}></div>
+            </div>
+            <div className="purpose-mini-legend">
+              U: {record.utilizationCount} | M: {record.maintenanceCount} | B: {record.brokenCount}
+            </div>
+          </div>
+        );
+      },
+    },
+  ];
+
+  // Table columns for Top Technicians
+  const technicianColumns = [
+    {
+      title: 'Technician',
+      dataIndex: 'name',
+      key: 'name',
+    },
+    {
+      title: 'Reservations',
+      dataIndex: 'count',
+      key: 'count',
+      sorter: (a, b) => a.count - b.count,
+    },
+    {
+      title: 'Total Cost',
+      key: 'totalCost',
+      render: (_, record) => formatCurrency(record.totalCost),
+      sorter: (a, b) => a.totalCost - b.totalCost,
+    },
+    {
+      title: 'Avg Cost/Event',
+      key: 'avgCost',
+      render: (_, record) => formatCurrency(record.avgCost),
+      sorter: (a, b) => a.avgCost - b.avgCost,
+    },
+  ];
+
+  // Table columns for Monthly Trends
+  const monthlyColumns = [
+    {
+      title: 'Month',
+      key: 'month',
+      render: (_, record) => `${record.name} ${record.year}`,
+    },
+    {
+      title: 'Reservations',
+      dataIndex: 'count',
+      key: 'count',
+      sorter: (a, b) => a.count - b.count,
+    },
+    {
+      title: 'Total Cost',
+      key: 'cost',
+      render: (_, record) => formatCurrency(record.cost),
+      sorter: (a, b) => a.cost - b.cost,
+    },
+    {
+      title: 'Activity Trend',
+      key: 'trend',
+      render: (_, record) => (
+        <Progress 
+          percent={Math.min(record.count * 5, 100)} 
+          size="small" 
+          showInfo={false}
+          strokeColor={record.count > 0 ? '#1890ff' : '#f0f0f0'}
+          style={{ width: 150 }}
+        />
+      ),
+    },
+  ];
+
+  // Table columns for Recent Reservations
+  const recentEventsColumns = [
+    {
+      title: 'Date',
+      key: 'date',
+      render: (_, record) => new Date(record.start).toLocaleDateString(),
+    },
+    {
+      title: 'Title',
+      dataIndex: 'title',
+      key: 'title',
+    },
+    {
+      title: 'Equipment',
+      key: 'equipment',
+      render: (_, record) => record.equipment || resources.find(r => r.id === record.resourceId)?.title || 'Unknown',
+    },
+    {
+      title: 'Purpose',
+      key: 'purpose',
+      render: (_, record) => getPurposeTag(record.purpose || 'Utilization'),
+    },
+    {
+      title: 'Cost',
+      key: 'cost',
+      render: (_, record) => formatCurrency(record.cost || 0),
+    },
+  ];
 
   return (
-    <div className="dashboard-container">
-      <div className="content-header">
-        <h1>{tenantName} - Analytics & Reports</h1>
-        <div className="header-actions">
-          <button 
-            className="btn btn-outline-primary"
-            onClick={() => console.log('Go to calendar view')}
-          >
-            <i className="fas fa-calendar-alt me-1"></i>
-            Calendar View
-          </button>
+    <div className="analytics-container">
+      <Card className="header-card">
+        <div className="header-content">
+          <Title level={3}>{getDisplayName()} - Analytics & Reports</Title>
+          <div className="header-actions">
+            <Button 
+              type="primary"
+              icon={<CalendarOutlined />}
+              onClick={() => navigate(`/${tenantId}`)}
+            >
+              Calendar View
+            </Button>
+          </div>
         </div>
-      </div>
+      </Card>
       
       {loading ? (
-        <div className="loading-container">
-          <div>Loading analytics data...</div>
-        </div>
+        <Card>
+          <div className="loading-container">
+            <Spin size="large" tip="Loading analytics data..." />
+          </div>
+        </Card>
       ) : error ? (
-        <div className="error-message">
-          <h3>Error</h3>
-          <p>{error}</p>
-          <button className="btn btn-primary mt-3" onClick={() => console.log('Return to dashboard')}>
-            Return to Main Dashboard
-          </button>
-        </div>
+        <Card>
+          <Alert
+            message="Error Loading Analytics"
+            description={error}
+            type="error"
+            showIcon
+            action={
+              <Button onClick={() => navigate('/')} type="primary">
+                Return to Main Dashboard
+              </Button>
+            }
+          />
+        </Card>
       ) : (
-        <div className="analytics-dashboard">
-          <div className="analytics-header card">
-            <div className="card-body">
-              <div className="date-range-picker">
-                <label className="filter-label">Time Range</label>
-                <select 
-                  className="filter-select"
-                  value={timeRange}
-                  onChange={(e) => setTimeRange(e.target.value)}
-                >
-                  <option value="7days">Last 7 Days</option>
-                  <option value="30days">Last 30 Days</option>
-                  <option value="90days">Last 90 Days</option>
-                  <option value="12months">Last 12 Months</option>
-                </select>
-              </div>
+        <div className="analytics-content">
+          <Card className="filter-card">
+            <div className="date-range-picker">
+              <Text strong>Time Range:</Text>
+              <Select 
+                value={timeRange}
+                onChange={(value) => setTimeRange(value)}
+                style={{ width: 150 }}
+              >
+                <Option value="7days">Last 7 Days</Option>
+                <Option value="30days">Last 30 Days</Option>
+                <Option value="90days">Last 90 Days</Option>
+                <Option value="12months">Last 12 Months</Option>
+              </Select>
             </div>
-          </div>
+          </Card>
           
-          <div className="stat-cards">
-            <div className="stat-card">
-              <div className="stat-title">Total Reservations</div>
-              <div className="stat-value">{metrics.totalEvents}</div>
-              <div className="stat-sub">in the selected period</div>
-            </div>
-            
-            <div className="stat-card">
-              <div className="stat-title">Reservations per Day</div>
-              <div className="stat-value">{metrics.eventsPerDay}</div>
-              <div className="stat-sub">average</div>
-            </div>
-            
-            <div className="stat-card">
-              <div className="stat-title">Utilization Rate</div>
-              <div className="stat-value">{metrics.utilizationRate}%</div>
-              <div className="stat-sub">of total capacity</div>
-            </div>
-            
-            <div className="stat-card">
-              <div className="stat-title">Active Equipment</div>
-              <div className="stat-value">{equipmentUtilization.filter(e => e.count > 0).length}</div>
-              <div className="stat-sub">of {resources.length} total</div>
-            </div>
-          </div>
+          <Row gutter={16} className="stats-row">
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Total Reservations"
+                  value={metrics.totalEvents}
+                  prefix={<BarChartOutlined />}
+                  suffix={<Text type="secondary" style={{ fontSize: '14px' }}>in period</Text>}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Reservations Per Day"
+                  value={metrics.eventsPerDay}
+                  precision={1}
+                  prefix={<CalendarOutlined />}
+                  suffix={<Text type="secondary" style={{ fontSize: '14px' }}>avg</Text>}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Utilization Rate"
+                  value={metrics.utilizationRate}
+                  prefix={<PieChartOutlined />}
+                  suffix="%"
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Active Equipment"
+                  value={equipmentUtilization.filter(e => e.count > 0).length}
+                  suffix={`/ ${resources.length}`}
+                />
+              </Card>
+            </Col>
+          </Row>
           
           {/* Cost Summary Section */}
-          <div className="report-section">
-            <h2 className="section-title">Cost Summary</h2>
-            <div className="stat-cards">
-              <div className="stat-card">
-                <div className="stat-title">Total Cost</div>
-                <div className="stat-value">{formatCurrency(costMetrics.totalCost)}</div>
-                <div className="stat-sub">all events</div>
-              </div>
-              
-              <div className="stat-card">
-                <div className="stat-title">Average Cost</div>
-                <div className="stat-value">{formatCurrency(costMetrics.avgCost)}</div>
-                <div className="stat-sub">per event</div>
-              </div>
-              
-              <div className="stat-card">
-                <div className="stat-title">Utilization Cost</div>
-                <div className="stat-value">{formatCurrency(costMetrics.utilizationCost)}</div>
-                <div className="stat-sub">{purposeBreakdown.utilization} events</div>
-              </div>
-              
-              <div className="stat-card">
-                <div className="stat-title">Maintenance Cost</div>
-                <div className="stat-value">{formatCurrency(costMetrics.maintenanceCost)}</div>
-                <div className="stat-sub">{purposeBreakdown.maintenance} events</div>
-              </div>
-            </div>
-          </div>
+          <Card title="Cost Summary" className="section-card">
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={6}>
+                <Card bordered={false}>
+                  <Statistic
+                    title="Total Cost"
+                    value={costMetrics.totalCost}
+                    precision={0}
+                    prefix={<DollarOutlined />}
+                    formatter={(value) => formatCurrency(value)}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Card bordered={false}>
+                  <Statistic
+                    title="Average Cost"
+                    value={costMetrics.avgCost}
+                    precision={0}
+                    prefix={<DollarOutlined />}
+                    formatter={(value) => formatCurrency(value)}
+                    suffix={<Text type="secondary" style={{ fontSize: '14px' }}>per event</Text>}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Card bordered={false}>
+                  <Statistic
+                    title="Utilization Cost"
+                    value={costMetrics.utilizationCost}
+                    precision={0}
+                    prefix={<DollarOutlined />}
+                    formatter={(value) => formatCurrency(value)}
+                    suffix={<Text type="secondary" style={{ fontSize: '14px' }}>{purposeBreakdown.utilization} events</Text>}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Card bordered={false}>
+                  <Statistic
+                    title="Maintenance Cost"
+                    value={costMetrics.maintenanceCost}
+                    precision={0}
+                    prefix={<DollarOutlined />}
+                    formatter={(value) => formatCurrency(value)}
+                    suffix={<Text type="secondary" style={{ fontSize: '14px' }}>{purposeBreakdown.maintenance} events</Text>}
+                  />
+                </Card>
+              </Col>
+            </Row>
+          </Card>
           
           {/* Purpose Breakdown Section */}
-          <div className="report-section card">
-            <div className="card-header">
-              <h2 className="card-title">Purpose Breakdown</h2>
-            </div>
-            <div className="card-body">
-              <div className="purpose-breakdown">
-                <PurposeBreakdownChart data={purposeBreakdown} />
+          <Card title="Purpose Breakdown" className="section-card">
+            <div className="purpose-breakdown-container">
+              <div className="purpose-bars">
+                <div className="purpose-bar">
+                  <Text strong>Utilization</Text>
+                  <Progress 
+                    percent={purposeBreakdown.utilizationPercent} 
+                    strokeColor="#1890ff"
+                    format={(percent) => `${percent}%`}
+                  />
+                  <Text>{purposeBreakdown.utilization} events</Text>
+                </div>
                 
-                <div className="breakdown-stats">
-                  <div className="breakdown-stat">
-                    <div className="stat-title">Downtime Ratio</div>
-                    <div className="stat-value">{metrics.downtimeRatio}%</div>
-                    <div className="stat-sub">maintenance + broken events</div>
-                  </div>
+                <div className="purpose-bar">
+                  <Text strong>Maintenance</Text>
+                  <Progress 
+                    percent={purposeBreakdown.maintenancePercent} 
+                    strokeColor="#faad14"
+                    format={(percent) => `${percent}%`}
+                  />
+                  <Text>{purposeBreakdown.maintenance} events</Text>
+                </div>
+                
+                <div className="purpose-bar">
+                  <Text strong>Broken</Text>
+                  <Progress 
+                    percent={purposeBreakdown.brokenPercent} 
+                    strokeColor="#f5222d"
+                    format={(percent) => `${percent}%`}
+                  />
+                  <Text>{purposeBreakdown.broken} events</Text>
                 </div>
               </div>
+              
+              <div className="downtime-stat">
+                <Card bordered={false}>
+                  <Statistic
+                    title="Downtime Ratio"
+                    value={metrics.downtimeRatio}
+                    suffix="%"
+                    valueStyle={{ color: metrics.downtimeRatio > 25 ? '#f5222d' : '#3f8600' }}
+                  />
+                  <Text type="secondary">maintenance + broken events</Text>
+                </Card>
+              </div>
             </div>
-          </div>
+          </Card>
           
           {/* Equipment Utilization Table */}
-          <div className="report-section card">
-            <div className="card-header">
-              <h2 className="card-title">Equipment Utilization & Costs</h2>
-            </div>
-            <div className="card-body">
-              <table className="report-table">
-                <thead>
-                  <tr>
-                    <th>Equipment</th>
-                    <th>Total Events</th>
-                    <th>Utilization %</th>
-                    <th>Total Cost</th>
-                    <th>Avg Cost/Event</th>
-                    <th>Purpose Breakdown</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {equipmentUtilization.map((equipment) => (
-                    <tr key={equipment.id}>
-                      <td>{equipment.name}</td>
-                      <td>{equipment.count}</td>
-                      <td>
-                        <div className="utilization-bar" style={{ width: '100px', display: 'inline-block', marginRight: '10px' }}>
-                          <div className="utilization-fill" style={{ width: `${equipment.utilization}%` }}></div>
-                        </div>
-                        {equipment.utilization}%
-                      </td>
-                      <td>{formatCurrency(equipment.totalCost)}</td>
-                      <td>{formatCurrency(equipment.avgCost)}</td>
-                      <td>
-                        <div className="purpose-mini-chart">
-                          <div className="mini-bar utilization" style={{ width: `${equipment.count ? (equipment.utilizationCount / equipment.count) * 100 : 0}%` }}></div>
-                          <div className="mini-bar maintenance" style={{ width: `${equipment.count ? (equipment.maintenanceCount / equipment.count) * 100 : 0}%` }}></div>
-                          <div className="mini-bar broken" style={{ width: `${equipment.count ? (equipment.brokenCount / equipment.count) * 100 : 0}%` }}></div>
-                        </div>
-                        <div className="purpose-mini-legend">
-                          U: {equipment.utilizationCount} | M: {equipment.maintenanceCount} | B: {equipment.brokenCount}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  
-                  {equipmentUtilization.length === 0 && (
-                    <tr>
-                      <td colSpan="6" className="text-center py-4">
-                        <i className="fas fa-info-circle me-2"></i>
-                        No equipment utilization data available
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <Card title="Equipment Utilization & Costs" className="section-card">
+            <Table 
+              dataSource={equipmentUtilization} 
+              columns={equipmentColumns}
+              rowKey="id"
+              pagination={{ pageSize: 5 }}
+              locale={{
+                emptyText: (
+                  <div style={{ padding: '20px 0' }}>
+                    <Text type="secondary">No equipment utilization data available</Text>
+                  </div>
+                )
+              }}
+            />
+          </Card>
           
           {/* Top Technicians Section */}
-          <div className="report-section card">
-            <div className="card-header">
-              <h2 className="card-title">Top Technicians</h2>
-            </div>
-            <div className="card-body">
-              {topTechnicians.length > 0 ? (
-                <table className="report-table">
-                  <thead>
-                    <tr>
-                      <th>Technician</th>
-                      <th>Reservations</th>
-                      <th>Total Cost</th>
-                      <th>Avg Cost/Event</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topTechnicians.map((technician, index) => (
-                      <tr key={index}>
-                        <td>{technician.name}</td>
-                        <td>{technician.count}</td>
-                        <td>{formatCurrency(technician.totalCost)}</td>
-                        <td>{formatCurrency(technician.avgCost)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="text-center py-4">
-                  <i className="fas fa-user-slash me-2"></i>
-                  No technician data available
-                </div>
-              )}
-            </div>
-          </div>
+          <Card title="Top Technicians" className="section-card">
+            <Table 
+              dataSource={topTechnicians} 
+              columns={technicianColumns}
+              rowKey="name"
+              pagination={false}
+              locale={{
+                emptyText: (
+                  <div style={{ padding: '20px 0' }}>
+                    <Text type="secondary">No technician data available</Text>
+                  </div>
+                )
+              }}
+            />
+          </Card>
           
           {/* Monthly Trends Section */}
-          <div className="report-section card">
-            <div className="card-header">
-              <h2 className="card-title">Monthly Trends</h2>
-            </div>
-            <div className="card-body">
-              <table className="report-table">
-                <thead>
-                  <tr>
-                    <th>Month</th>
-                    <th>Reservations</th>
-                    <th>Total Cost</th>
-                    <th>Activity Trend</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {monthlyEventCounts.map((month, index) => (
-                    <tr key={index}>
-                      <td>{month.name} {month.year}</td>
-                      <td>{month.count}</td>
-                      <td>{formatCurrency(month.cost)}</td>
-                      <td>
-                        <div className="utilization-bar" style={{ width: '150px', display: 'inline-block' }}>
-                          <div 
-                            className="utilization-fill" 
-                            style={{ 
-                              width: `${Math.min(month.count * 5, 100)}%`,
-                              backgroundColor: month.count > 0 ? '#4285F4' : '#e9ecef'
-                            }}
-                          ></div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <Card title="Monthly Trends" className="section-card">
+            <Table 
+              dataSource={monthlyEventCounts} 
+              columns={monthlyColumns}
+              rowKey={(record) => `${record.month}-${record.year}`}
+              pagination={false}
+            />
+          </Card>
+          
+          {/* Recent Reservations Section */}
+          <Card title="Recent Reservations" className="section-card">
+            <Table 
+              dataSource={getFilteredEvents().slice(0, 10)} 
+              columns={recentEventsColumns}
+              rowKey="id"
+              pagination={false}
+              locale={{
+                emptyText: (
+                  <div style={{ padding: '20px 0' }}>
+                    <Text type="secondary">No reservations found in the selected time period</Text>
+                  </div>
+                )
+              }}
+            />
+          </Card>
         </div>
       )}
     </div>
