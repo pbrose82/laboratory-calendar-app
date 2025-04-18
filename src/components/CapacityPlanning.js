@@ -12,6 +12,10 @@ import {
 import { fetchTenant } from '../services/apiClient';
 import './ResourceViews.css';
 import './CapacityPlanning.css'; // We'll create this stylesheet next
+import { 
+  Card, Row, Col, Button, Typography, Select, DatePicker, Spin, 
+  Alert, Space, Table, Tag, Tooltip, Statistic, Tabs, Progress
+} from 'antd';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
