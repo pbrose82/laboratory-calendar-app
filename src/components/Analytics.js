@@ -1660,8 +1660,935 @@ function Analytics() {
               </Tooltip>
             }
           >
-            {/* Tab content goes here - all your tab panes */}
-            {/* Since this is where the component was cut off, you would need to add all your TabPane components here */}
+            {/* Tab 1: Overview */}
+<TabPane 
+  tab={<span><AppstoreOutlined /> Overview</span>}
+  key="overview"
+>
+  {/* Overall Summary Stats */}
+  <Row gutter={16} className="stats-row">
+    <Col xs={24} sm={12} md={6}>
+      <Card>
+        <Statistic
+          title="Total Equipment"
+          value={resources.length}
+          prefix={<BarChartOutlined />}
+        />
+      </Card>
+    </Col>
+    <Col xs={24} sm={12} md={6}>
+      <Card>
+        <Statistic
+          title="Active Equipment"
+          value={equipmentUtilization.filter(e => e.count > 0).length}
+          suffix={`/ ${resources.length}`}
+        />
+      </Card>
+    </Col>
+    <Col xs={24} sm={12} md={6}>
+      <Card>
+        <Statistic
+          title="Uptime %"
+          value={totalHours.uptimePercent}
+          suffix="%"
+          valueStyle={{ color: totalHours.uptimePercent > 75 ? '#3f8600' : '#faad14' }}
+        />
+      </Card>
+    </Col>
+    <Col xs={24} sm={12} md={6}>
+      <Card>
+        <Statistic
+          title="Downtime %"
+          value={totalHours.downtimePercent}
+          suffix="%"
+          valueStyle={{ color: totalHours.downtimePercent < 25 ? '#3f8600' : '#f5222d' }}
+        />
+      </Card>
+    </Col>
+  </Row>
+
+  {/* Efficiency Score */}
+  <Card className="section-card">
+    <Row gutter={16}>
+      <Col xs={24} md={12}>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text strong>Overall Efficiency Score</Text>
+            <span style={{ fontWeight: 'bold', fontSize: '18px', color: 
+              efficiencyScore >= 80 ? '#3f8600' : 
+              efficiencyScore >= 60 ? '#1890ff' : 
+              efficiencyScore >= 40 ? '#faad14' : '#f5222d' 
+            }}>
+              {efficiencyScore}%
+            </span>
+          </div>
+          <Progress 
+            percent={efficiencyScore} 
+            strokeColor={{
+              '0%': '#f5222d',
+              '25%': '#faad14',
+              '50%': '#1890ff',
+              '75%': '#52c41a',
+              '100%': '#52c41a',
+            }}
+            status="active"
+          />
+          <Text type="secondary">Based on utilization rates, downtime, and ROI metrics</Text>
+        </div>
+      </Col>
+      
+      <Col xs={24} md={12}>
+        <Row gutter={[16, 16]} style={{ marginTop: 8 }}>
+          <Col span={8}>
+            <Statistic
+              title="Utilization"
+              value={`${totalHours.utilizationPercent}%`}
+              valueStyle={{ color: '#1890ff', fontSize: '16px' }}
+            />
+          </Col>
+          <Col span={8}>
+            <Statistic
+              title="Maintenance"
+              value={`${totalHours.maintenancePercent}%`}
+              valueStyle={{ color: '#faad14', fontSize: '16px' }}
+            />
+          </Col>
+          <Col span={8}>
+            <Statistic
+              title="Downtime"
+              value={`${totalHours.brokenPercent}%`}
+              valueStyle={{ color: '#f5222d', fontSize: '16px' }}
+            />
+          </Col>
+        </Row>
+      </Col>
+    </Row>
+  </Card>
+  
+  {/* Time Distribution Section */}
+  <Card 
+    title={<span><ClockCircleOutlined /> Equipment Time Distribution</span>}
+    className="section-card"
+    extra={
+      <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportEquipmentCSV()}>
+        Export
+      </Button>
+    }
+  >
+    <Row gutter={16}>
+      <Col xs={24} md={12}>
+        <Card bordered={false} className="hour-stats-card">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Statistic
+                title="Total Utilization [h]"
+                value={formatHours(totalHours.utilizationHours)}
+                prefix={<BarChartOutlined style={{ color: '#1890ff' }} />}
+              />
+            </Col>
+            <Col span={12}>
+              <Statistic
+                title="Total Maintenance [h]"
+                value={formatHours(totalHours.maintenanceHours)}
+                prefix={<ExclamationOutlined style={{ color: '#faad14' }} />}
+              />
+            </Col>
+          </Row>
+          <Row gutter={16} style={{ marginTop: '20px' }}>
+            <Col span={12}>
+              <Statistic
+                title="Total Broken [h]"
+                value={formatHours(totalHours.brokenHours)}
+                prefix={<CloseCircleOutlined style={{ color: '#f5222d' }} />}
+              />
+            </Col>
+            <Col span={12}>
+              <Statistic
+                title="Total Idle [h]"
+                value={formatHours(totalHours.idleHours)}
+                prefix={<ClockCircleOutlined style={{ color: '#52c41a' }} />}
+              />
+            </Col>
+          </Row>
+        </Card>
+      </Col>
+      <Col xs={24} md={12}>
+        <div className="uptime-downtime-chart">
+          <h4>Uptime vs Downtime</h4>
+          <div className="bar-chart-container">
+            <div className="stacked-bar">
+              <div 
+                className="bar-segment uptime" 
+                style={{ width: `${totalHours.uptimePercent}%` }}
+              >
+                Uptime: {totalHours.uptimePercent}%
+              </div>
+              <div 
+                className="bar-segment downtime" 
+                style={{ width: `${totalHours.downtimePercent}%` }}
+              >
+                Downtime: {totalHours.downtimePercent}%
+              </div>
+            </div>
+            <div className="bar-legend">
+              <div className="legend-item">
+                <div className="color-box uptime"></div>
+                <span>Uptime (Utilization + Idle): {formatHours(totalHours.utilizationHours + totalHours.idleHours)}</span>
+              </div>
+              <div className="legend-item">
+                <div className="color-box downtime"></div>
+                <span>Downtime (Maintenance + Broken): {formatHours(totalHours.maintenanceHours + totalHours.brokenHours)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Col>
+    </Row>
+  </Card>
+  
+  {/* Recent Reservations Section */}
+  <Card 
+    title={<span><CalendarOutlined /> Recent Reservations</span>}
+    className="section-card"
+    extra={
+      <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportEventsCSV()}>
+        Export
+      </Button>
+    }
+  >
+    <Table 
+      dataSource={getFilteredEvents().slice(0, 10)} 
+      columns={recentEventsColumns}
+      rowKey="id"
+      pagination={false}
+      locale={{
+        emptyText: (
+          <div style={{ padding: '20px 0' }}>
+            <Text type="secondary">No reservations found in the selected time period</Text>
+          </div>
+        )
+      }}
+    />
+  </Card>
+</TabPane>
+
+{/* Tab 2: Utilization Details */}
+<TabPane 
+  tab={<span><BarChartOutlined /> Utilization Details</span>} 
+  key="utilization"
+>
+  {/* Equipment Utilization Table */}
+  <Card 
+    title={<span><BarChartOutlined /> Equipment Utilization Report</span>}
+    className="section-card"
+    extra={
+      <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportEquipmentCSV()}>
+        Export
+      </Button>
+    }
+  >
+    <Table 
+      dataSource={equipmentUtilization} 
+      columns={equipmentColumns}
+      rowKey="id"
+      pagination={{ pageSize: 10 }}
+      summary={pageData => {
+        let totalUtilizationHours = 0;
+        let totalMaintenanceHours = 0;
+        let totalBrokenHours = 0;
+        let totalIdleHours = 0;
+        
+        pageData.forEach(({ utilizationHours, maintenanceHours, brokenHours, idleHours }) => {
+          totalUtilizationHours += utilizationHours || 0;
+          totalMaintenanceHours += maintenanceHours || 0;
+          totalBrokenHours += brokenHours || 0;
+          totalIdleHours += idleHours || 0;
+        });
+        
+        // Calculate total uptime and downtime for the table
+        const totalHours = totalUtilizationHours + totalMaintenanceHours + totalBrokenHours + totalIdleHours;
+        const uptimePercent = totalHours > 0 
+          ? Math.round(((totalUtilizationHours + totalIdleHours) / totalHours) * 100) 
+          : 0;
+        const downtimePercent = totalHours > 0 
+          ? Math.round(((totalMaintenanceHours + totalBrokenHours) / totalHours) * 100) 
+          : 0;
+        
+        return (
+          <>
+            <Table.Summary.Row className="font-bold">
+              <Table.Summary.Cell index={0}>Total</Table.Summary.Cell>
+              <Table.Summary.Cell index={1}>{formatHours(totalUtilizationHours)}</Table.Summary.Cell>
+              <Table.Summary.Cell index={2}>{formatHours(totalMaintenanceHours)}</Table.Summary.Cell>
+              <Table.Summary.Cell index={3}>{formatHours(totalBrokenHours)}</Table.Summary.Cell>
+              <Table.Summary.Cell index={4}>{formatHours(totalIdleHours)}</Table.Summary.Cell>
+              <Table.Summary.Cell index={5}>{uptimePercent}%</Table.Summary.Cell>
+              <Table.Summary.Cell index={6}>{downtimePercent}%</Table.Summary.Cell>
+            </Table.Summary.Row>
+          </>
+        );
+      }}
+      locale={{
+        emptyText: (
+          <div style={{ padding: '20px 0' }}>
+            <Text type="secondary">No equipment utilization data available</Text>
+          </div>
+        )
+      }}
+    />
+  </Card>
+  
+  {/* Equipment Utilization Bar Chart */}
+  <Card 
+    title={<span><AreaChartOutlined /> Instrument Utilization Chart</span>}
+    className="section-card"
+  >
+    <div className="instrument-bar-chart">
+      {equipmentUtilization.slice(0, 10).map((item, index) => (
+        <div key={index} className="equipment-bar-container">
+          <div className="equipment-name">{item.name}</div>
+          <div className="equipment-bar">
+            <div 
+              className="bar-segment utilization" 
+              style={{ width: `${(item.utilizationHours / (item.utilizationHours + item.maintenanceHours + item.brokenHours + item.idleHours)) * 100}%` }}
+              title={`Utilization: ${formatHours(item.utilizationHours)}`}
+            ></div>
+            <div 
+              className="bar-segment maintenance" 
+              style={{ width: `${(item.maintenanceHours / (item.utilizationHours + item.maintenanceHours + item.brokenHours + item.idleHours)) * 100}%` }}
+              title={`Maintenance: ${formatHours(item.maintenanceHours)}`}
+            ></div>
+            <div 
+              className="bar-segment broken" 
+              style={{ width: `${(item.brokenHours / (item.utilizationHours + item.maintenanceHours + item.brokenHours + item.idleHours)) * 100}%` }}
+              title={`Broken: ${formatHours(item.brokenHours)}`}
+            ></div>
+            <div 
+              className="bar-segment idle" 
+              style={{ width: `${(item.idleHours / (item.utilizationHours + item.maintenanceHours + item.brokenHours + item.idleHours)) * 100}%` }}
+              title={`Idle: ${formatHours(item.idleHours)}`}
+            ></div>
+          </div>
+          <div className="equipment-hours">
+            {formatHours(item.utilizationHours + item.maintenanceHours + item.brokenHours + item.idleHours)}
+          </div>
+        </div>
+      ))}
+      <div className="bar-chart-legend">
+        <div className="legend-item">
+          <div className="color-box utilization"></div>
+          <span>Utilization</span>
+        </div>
+        <div className="legend-item">
+          <div className="color-box maintenance"></div>
+          <span>Maintenance</span>
+        </div>
+        <div className="legend-item">
+          <div className="color-box broken"></div>
+          <span>Broken</span>
+        </div>
+        <div className="legend-item">
+          <div className="color-box idle"></div>
+          <span>Idle</span>
+        </div>
+      </div>
+    </div>
+  </Card>
+  
+  {/* Top Technicians Section */}
+  <Card 
+    title={<span><TeamOutlined /> Top Technicians</span>}
+    className="section-card"
+    extra={
+      <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportTechnicianCSV()}>
+        Export
+      </Button>
+    }
+  >
+    <Table 
+      dataSource={topTechnicians} 
+      columns={technicianColumns}
+      rowKey="name"
+      pagination={false}
+      locale={{
+        emptyText: (
+          <div style={{ padding: '20px 0' }}>
+            <Text type="secondary">No technician data available</Text>
+          </div>
+        )
+      }}
+    />
+  </Card>
+  
+  {/* Monthly Trends Section */}
+  <Card 
+    title={<span><AreaChartOutlined /> Monthly Trends</span>}
+    className="section-card"
+    extra={
+      <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportMonthlyCSV()}>
+        Export
+      </Button>
+    }
+  >
+    <Table 
+      dataSource={monthlyEventCounts} 
+      columns={monthlyColumns}
+      rowKey={(record) => `${record.month}-${record.year}`}
+      pagination={false}
+    />
+  </Card>
+</TabPane>
+
+{/* Tab 3: ROI Analysis */}
+<TabPane 
+  tab={<span><DollarOutlined /> ROI Analysis</span>} 
+  key="roi"
+>
+  <Card 
+    title={<span><DollarOutlined /> ROI Analysis & Financial Performance</span>}
+    className="section-card"
+    extra={
+      <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportROIData()}>
+        Export
+      </Button>
+    }
+  >
+    <Row gutter={16}>
+      <Col xs={24} md={12}>
+        <Card bordered={false} className="hour-stats-card">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Statistic
+                title="Total Revenue"
+                value={formatCurrency(roiData.utilizationRevenue)}
+                prefix={<RiseOutlined style={{ color: '#52c41a' }} />}
+                precision={0}
+              />
+            </Col>
+            <Col span={12}>
+              <Statistic
+                title="Total Cost"
+                value={formatCurrency(roiData.totalCost)}
+                prefix={<FallOutlined style={{ color: '#f5222d' }} />}
+                precision={0}
+              />
+            </Col>
+          </Row>
+          <Row gutter={16} style={{ marginTop: '20px' }}>
+            <Col span={12}>
+              <Statistic
+                title="Net Profit"
+                value={formatCurrency(roiData.totalProfit)}
+                valueStyle={{ color: roiData.totalProfit >= 0 ? '#3f8600' : '#cf1322' }}
+                prefix={roiData.totalProfit >= 0 ? <RiseOutlined /> : <FallOutlined />}
+                precision={0}
+              />
+            </Col>
+            <Col span={12}>
+              <Statistic
+                title="ROI"
+                value={roiData.roi}
+                suffix="%"
+                valueStyle={{ color: roiData.roi >= 30 ? '#3f8600' : roiData.roi >= 0 ? '#faad14' : '#cf1322' }}
+                precision={1}
+              />
+            </Col>
+          </Row>
+        </Card>
+      </Col>
+      <Col xs={24} md={12}>
+        <Card bordered={false} className="hour-stats-card">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Statistic
+                title="Avg. Rate/Hour"
+                value={formatCurrency(roiData.averageRatePerHour)}
+                prefix={<DollarOutlined />}
+                precision={0}
+              />
+            </Col>
+            <Col span={12}>
+              <Statistic
+                title="Cost Savings"
+                value={formatCurrency(roiData.costSavings)}
+                prefix={<DollarOutlined style={{ color: '#52c41a' }} />}
+                precision={0}
+                tooltip="Savings compared to outsourcing same work"
+              />
+            </Col>
+          </Row>
+          <Row gutter={16} style={{ marginTop: '20px' }}>
+            <Col span={24}>
+              <Statistic
+                title="Payback Period"
+                value={roiData.paybackPeriodDays}
+                suffix=" days"
+                valueStyle={{ 
+                  color: roiData.paybackPeriodDays < 365 ? '#3f8600' : 
+                    roiData.paybackPeriodDays < 730 ? '#faad14' : '#cf1322' 
+                }}
+              />
+            </Col>
+          </Row>
+        </Card>
+      </Col>
+    </Row>
+  </Card>
+  
+  {/* Equipment Cost Analysis */}
+  <Card
+    title={<span><BarChartOutlined /> Equipment Cost Analysis</span>}
+    className="section-card"
+  >
+    <Row gutter={16}>
+      <Col xs={24} md={8}>
+        <Card bordered={false}>
+          <Statistic
+            title="Purpose Cost Distribution"
+            value=""
+            suffix=""
+          />
+          <div className="purpose-cost-breakdown" style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text>Utilization</Text>
+              <Text>{formatCurrency(costMetrics.utilizationCost)}</Text>
+            </div>
+            <Progress 
+              percent={costMetrics.totalCost > 0 ? (costMetrics.utilizationCost / costMetrics.totalCost) * 100 : 0} 
+              strokeColor="#1890ff"
+              showInfo={false}
+            />
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, marginBottom: 8 }}>
+              <Text>Maintenance</Text>
+              <Text>{formatCurrency(costMetrics.maintenanceCost)}</Text>
+            </div>
+            <Progress 
+              percent={costMetrics.totalCost > 0 ? (costMetrics.maintenanceCost / costMetrics.totalCost) * 100 : 0} 
+              strokeColor="#faad14"
+              showInfo={false}
+            />
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, marginBottom: 8 }}>
+              <Text>Broken</Text>
+              <Text>{formatCurrency(costMetrics.brokenCost)}</Text>
+            </div>
+            <Progress 
+              percent={costMetrics.totalCost > 0 ? (costMetrics.brokenCost / costMetrics.totalCost) * 100 : 0} 
+              strokeColor="#f5222d"
+              showInfo={false}
+            />
+          </div>
+        </Card>
+      </Col>
+      
+      <Col xs={24} md={16}>
+        <Table
+          dataSource={equipmentUtilization.map(item => ({
+            ...item,
+            costPerHour: item.utilizationHours > 0 ? item.totalCost / item.utilizationHours : 0,
+            costEfficiencyRatio: item.totalCost > 0 ? item.utilizationHours / item.totalCost * 100 : 0
+          }))}
+          columns={[
+            {
+              title: 'Equipment',
+              dataIndex: 'name',
+              key: 'name',
+            },
+            {
+              title: 'Total Cost',
+              dataIndex: 'totalCost',
+              key: 'totalCost',
+              render: value => formatCurrency(value),
+              sorter: (a, b) => a.totalCost - b.totalCost,
+            },
+            {
+              title: 'Cost/Hour',
+              dataIndex: 'costPerHour',
+              key: 'costPerHour',
+              render: value => value ? formatCurrency(value) : '-',
+              sorter: (a, b) => a.costPerHour - b.costPerHour,
+            },
+            {
+              title: 'Efficiency Ratio',
+              dataIndex: 'costEfficiencyRatio',
+              key: 'costEfficiencyRatio',
+              render: value => value ? `${value.toFixed(2)}` : '-',
+              sorter: (a, b) => a.costEfficiencyRatio - b.costEfficiencyRatio,
+            }
+          ]}
+          pagination={{ pageSize: 5 }}
+          rowKey="id"
+        />
+      </Col>
+    </Row>
+  </Card>
+</TabPane>
+
+{/* Tab 4: Targets & Performance */}
+<TabPane 
+  tab={<span><AimOutlined /> Targets & Performance</span>} 
+  key="targets"
+>
+  <Card 
+    title={<span><AimOutlined /> Equipment Utilization Targets</span>}
+    className="section-card"
+  >
+    <Row gutter={16}>
+      <Col xs={24} md={8}>
+        <Card bordered={false} className="hour-stats-card">
+          <Statistic
+            title="Overall Utilization vs Target"
+            value={targetPerformance.overall.actualUtilization}
+            suffix={`/ ${targetPerformance.overall.targetUtilization}%`}
+            valueStyle={{ 
+              color: targetPerformance.overall.status === 'above' ? '#3f8600' : 
+                targetPerformance.overall.status === 'close' ? '#faad14' : '#cf1322' 
+            }}
+          />
+          <div style={{ marginTop: 10 }}>
+            <Progress 
+              percent={targetPerformance.overall.actualUtilization} 
+              steps={20}
+              strokeColor={
+                targetPerformance.overall.status === 'above' ? '#52c41a' : 
+                targetPerformance.overall.status === 'close' ? '#faad14' : '#f5222d'
+              }
+              size="small"
+            />
+            <div style={{ marginTop: 5, display: 'flex', justifyContent: 'space-between' }}>
+              <Text type="secondary">0%</Text>
+              <div>
+                <Tag color="gold">Target: {targetPerformance.overall.targetUtilization}%</Tag>
+              </div>
+              <Text type="secondary">100%</Text>
+            </div>
+          </div>
+        </Card>
+      </Col>
+      <Col xs={24} md={16}>
+        <div style={{ overflowX: 'auto' }}>
+          <div style={{ minWidth: 500 }}>
+            {targetPerformance.equipment.slice(0, 5).map((item, index) => (
+              <div key={index} style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <Text strong style={{ maxWidth: '70%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.name}
+                  </Text>
+                  <div>
+                    <Badge 
+                      status={
+                        item.status === 'above' ? 'success' : 
+                        item.status === 'close' ? 'warning' : 'error'
+                      } 
+                    />
+                    <Text>{item.actualUtilization}% vs {item.targetUtilization}% target</Text>
+                  </div>
+                </div>
+                <Progress 
+                  percent={item.actualUtilization} 
+                  size="small"
+                  strokeColor={{
+                    '0%': '#108ee9',
+                    '100%': item.status === 'above' ? '#52c41a' : 
+                      item.status === 'close' ? '#faad14' : '#f5222d',
+                  }}
+                  success={{ 
+                    percent: Math.min(item.targetUtilization, item.actualUtilization),
+                    strokeColor: '#52c41a'
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </Col>
+    </Row>
+  </Card>
+  
+  {/* Equipment Performance Table */}
+  <Card
+    title={<span><BarChartOutlined /> Equipment Performance</span>}
+    className="section-card"
+  >
+    <Table
+      dataSource={targetPerformance.equipment}
+      columns={[
+        {
+          title: 'Equipment',
+          dataIndex: 'name',
+          key: 'name',
+        },
+        {
+          title: 'Target Utilization',
+          dataIndex: 'targetUtilization',
+          key: 'targetUtilization',
+          render: value => `${value}%`,
+          sorter: (a, b) => a.targetUtilization - b.targetUtilization,
+        },
+        {
+          title: 'Actual Utilization',
+          dataIndex: 'actualUtilization',
+          key: 'actualUtilization',
+          render: value => `${value}%`,
+          sorter: (a, b) => a.actualUtilization - b.actualUtilization,
+        },
+        {
+          title: 'Gap',
+          dataIndex: 'gap',
+          key: 'gap',
+          render: value => {
+            const isPositive = value >= 0;
+            return (
+              <Text style={{ color: isPositive ? '#3f8600' : '#cf1322' }}>
+                {isPositive ? '+' : ''}{value}%
+              </Text>
+            );
+          },
+          sorter: (a, b) => a.gap - b.gap,
+        },
+        {
+          title: 'Status',
+          dataIndex: 'status',
+          key: 'status',
+          render: value => {
+            let color = 'red';
+            let text = 'Below Target';
+            
+            if (value === 'above') {
+              color = 'green';
+              text = 'Above Target';
+            } else if (value === 'close') {
+              color = 'gold';
+              text = 'Near Target';
+            }
+            
+            return <Tag color={color}>{text}</Tag>;
+          },
+          filters: [
+            { text: 'Above Target', value: 'above' },
+            { text: 'Near Target', value: 'close' },
+            { text: 'Below Target', value: 'below' },
+          ],
+          onFilter: (value, record) => record.status === value,
+        }
+      ]}
+      pagination={{ pageSize: 10 }}
+      rowKey="id"
+    />
+  </Card>
+</TabPane>
+
+{/* Tab 5: Department Comparisons */}
+<TabPane 
+  tab={<span><BankOutlined /> Department Analysis</span>} 
+  key="departments"
+>
+  <Card 
+    title={<span><BankOutlined /> Department Comparisons</span>}
+    className="section-card"
+    extra={
+      <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportDepartmentData()}>
+        Export
+      </Button>
+    }
+  >
+    <Row gutter={[16, 16]}>
+      {departmentData.map((dept, index) => (
+        <Col xs={24} sm={12} md={8} key={index}>
+          <Card 
+            bordered
+            title={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>{dept.name}</span>
+                <Badge 
+                  count={`${dept.utilizationPercent}%`} 
+                  style={{ 
+                    backgroundColor: 
+                      dept.utilizationPercent >= 80 ? '#52c41a' : 
+                      dept.utilizationPercent >= 50 ? '#1890ff' : 
+                      dept.utilizationPercent >= 30 ? '#faad14' : '#f5222d'
+                  }}
+                />
+              </div>
+            }
+            size="small"
+          >
+            <div style={{ height: 200 }}>
+              <Row gutter={[8, 16]}>
+                <Col span={12}>
+                  <Statistic
+                    title="Equipment"
+                    value={dept.equipmentCount}
+                    valueStyle={{ fontSize: '1.2rem' }}
+                  />
+                </Col>
+                <Col span={12}>
+                  <Statistic
+                    title="Reservations"
+                    value={dept.eventCount}
+                    valueStyle={{ fontSize: '1.2rem' }}
+                  />
+                </Col>
+                <Col span={12}>
+                  <Statistic
+                    title="Hours"
+                    value={formatHours(dept.utilizationHours)}
+                    valueStyle={{ fontSize: '1.2rem' }}
+                  />
+                </Col>
+                <Col span={12}>
+                  <Statistic
+                    title="Efficiency"
+                    value={dept.resourceEfficiency}
+                    suffix="/equipment"
+                    valueStyle={{ fontSize: '1.2rem' }}
+                  />
+                </Col>
+              </Row>
+              
+              {/* Department purpose breakdown */}
+              <div style={{ marginTop: 16 }}>
+                <Text type="secondary">Purpose Breakdown:</Text>
+                <div style={{ display: 'flex', marginTop: 4 }}>
+                  <Tooltip title={`Utilization: ${formatHours(dept.utilizationHours)}`}>
+                    <div 
+                      style={{ 
+                        flex: dept.utilizationHours || 0.0001, 
+                        height: 8, 
+                        backgroundColor: '#1890ff', 
+                        borderRadius: '4px 0 0 4px',
+                        marginRight: (dept.maintenanceHours > 0 || dept.brokenHours > 0) ? 1 : 0
+                      }}
+                    />
+                  </Tooltip>
+                  <Tooltip title={`Maintenance: ${formatHours(dept.maintenanceHours)}`}>
+                    <div 
+                      style={{ 
+                        flex: dept.maintenanceHours || 0.0001, 
+                        height: 8, 
+                        backgroundColor: '#faad14',
+                        marginRight: dept.brokenHours > 0 ? 1 : 0
+                      }}
+                    />
+                  </Tooltip>
+                  <Tooltip title={`Broken: ${formatHours(dept.brokenHours)}`}>
+                    <div 
+                      style={{ 
+                        flex: dept.brokenHours || 0.0001, 
+                        height: 8, 
+                        backgroundColor: '#f5222d',
+                        borderRadius: '0 4px 4px 0'
+                      }}
+                    />
+                  </Tooltip>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </Col>
+      ))}
+    </Row>
+  </Card>
+  
+  {/* Department Comparison Table */}
+  <Card
+    title={<span><BarChartOutlined /> Department Comparison Table</span>}
+    className="section-card"
+  >
+    <Table
+      dataSource={departmentData}
+      columns={departmentColumns}
+      pagination={false}
+      rowKey="id"
+    />
+  </Card>
+</TabPane>
+
+{/* Tab 6: Optimization Recommendations */}
+<TabPane 
+  tab={<span><BulbOutlined /> Recommendations</span>} 
+  key="recommendations"
+>
+  <Card 
+    title={<span><BulbOutlined /> Resource Optimization Suggestions</span>}
+    className="section-card"
+  >
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <Text>Overall Efficiency Score</Text>
+          <Tooltip title="Based on utilization, downtime, and ROI metrics">
+            <InfoCircleOutlined style={{ marginLeft: 8 }} />
+          </Tooltip>
+        </div>
+        <div>
+          <Rate 
+            disabled 
+            allowHalf
+            value={efficiencyScore / 20} 
+            style={{ fontSize: 16 }}
+          />
+          <span style={{ marginLeft: 8 }}>{efficiencyScore}%</span>
+        </div>
+      </div>
+      <Progress 
+        percent={efficiencyScore} 
+        strokeColor={{
+          '0%': '#f5222d',
+          '25%': '#faad14',
+          '50%': '#1890ff',
+          '75%': '#52c41a',
+          '100%': '#52c41a',
+        }}
+        status="active"
+      />
+    </div>
+    
+    <Divider style={{ margin: '16px 0' }} />
+    
+    <List
+      itemLayout="horizontal"
+      dataSource={recommendations}
+      renderItem={item => (
+        <List.Item
+          actions={[
+            <Tag color={
+              item.priority === 'high' ? 'red' : 
+              item.priority === 'medium' ? 'orange' : 'blue'
+            }>
+              {item.priority} priority
+            </Tag>
+          ]}
+        >
+          <List.Item.Meta
+            avatar={
+              item.type === 'warning' ? <WarningOutlined style={{ fontSize: 24, color: '#f5222d' }} /> :
+              item.type === 'suggestion' ? <BulbOutlined style={{ fontSize: 24, color: '#1890ff' }} /> :
+              item.type === 'opportunity' ? <RocketOutlined style={{ fontSize: 24, color: '#52c41a' }} /> :
+              item.type === 'alert' ? <ExclamationOutlined style={{ fontSize: 24, color: '#faad14' }} /> :
+              <InfoCircleOutlined style={{ fontSize: 24 }} />
+            }
+            title={item.title}
+            description={
+              <div>
+                <p>{item.description}</p>
+                <p><Text type="secondary">{item.details}</Text></p>
+                <p>
+                  <Text strong>Impact: </Text> 
+                  <Text>{item.impact}</Text>
+                  {item.savings && (
+                    <Text> | <Text strong>Potential Value: </Text> {item.savings}</Text>
+                  )}
+                </p>
+              </div>
+            }
+          />
+        </List.Item>
+      )}
+    />
+  </Card>
+</TabPane>
           </Tabs>
         </div>
       )}
