@@ -131,6 +131,16 @@ function AppLayout({ children }) {
                 {isExpanded && <span className="t-4">Resource Dashboard</span>}
               </Link>
 
+              {/* Capacity Planning - NEW LINK */}
+              <Link to={`/${tenantId}/capacity-planning`}
+                    className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${isPathActive('/capacity-planning') ? 'c-selectable-item__dark--active' : ''}`}
+                    title={isExpanded ? null : 'Capacity Planning'}>
+                <div className="c-icon--medium u-background-transparent u-margin-right-xxs u-padding-left-none">
+                  <i className="fas fa-chart-line u-color-white-opacity-72"></i>
+                </div>
+                {isExpanded && <span className="t-4">Capacity Planning</span>}
+              </Link>
+
               {/* Equipment List View */}
               <Link to={`/${tenantId}/equipment-list`}
                     className={`c-sidenav__my-alchemy t-5 o-flex o-flex--middle u-padding-top-xs u-1/1 u-padding-horizontal-l ${isPathActive('/equipment-list') ? 'c-selectable-item__dark--active' : ''}`}
