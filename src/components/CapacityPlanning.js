@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Card, Row, Col, Button, Typography, Select, DatePicker, Spin, 
-  Alert, Space, Table, Tag, Tooltip, Statistic, Tabs
+  Alert, Space, Table, Tag, Tooltip, Statistic, Tabs, Progress
 } from 'antd';
 import { 
   CalendarOutlined, BarChartOutlined, LineChartOutlined, 
@@ -12,10 +12,6 @@ import {
 import { fetchTenant } from '../services/apiClient';
 import './ResourceViews.css';
 import './CapacityPlanning.css'; // We'll create this stylesheet next
-import { 
-  Card, Row, Col, Button, Typography, Select, DatePicker, Spin, 
-  Alert, Space, Table, Tag, Tooltip, Statistic, Tabs, Progress
-} from 'antd';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -789,7 +785,7 @@ function CapacityPlanning() {
                       return sum + (excess > 0 ? excess : 0);
                     }, 0).toFixed(1)}
                     suffix="hours"
-                    valueStyle={{ color: excess => excess > 0 ? '#f5222d' : '#52c41a' }}
+                    valueStyle={{ color: '#f5222d' }}
                   />
                 </Col>
               </Row>
