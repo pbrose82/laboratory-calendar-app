@@ -2,18 +2,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Card, Row, Col, Select, Button, Typography, Spin, Alert, 
-  Table, Statistic, Tag, Space, Divider, Progress, Dropdown, Menu
+  Table, Statistic, Tag, Space, Divider, Progress, Dropdown, Menu,
+  Tooltip, List, Badge, Rate, Tabs, Empty, Avatar, DatePicker
 } from 'antd';
 import {
   BarChartOutlined, PieChartOutlined, CalendarOutlined, DollarOutlined,
   CheckCircleOutlined, ExclamationOutlined, CloseCircleOutlined,
-  DownloadOutlined, FileExcelOutlined, FilePdfOutlined, ClockCircleOutlined
+  DownloadOutlined, FileExcelOutlined, FilePdfOutlined, ClockCircleOutlined,
+  BulbOutlined, AimOutlined, BankOutlined, RiseOutlined, FallOutlined,
+  TeamOutlined, SettingOutlined, UserOutlined, LikeOutlined, WarningOutlined,
+  RocketOutlined, InfoCircleOutlined, TrophyOutlined, ToolOutlined, EyeOutlined,
+  AppstoreOutlined, AreaChartOutlined, SyncOutlined, PartitionOutlined
 } from '@ant-design/icons';
 import { fetchTenant } from '../services/apiClient';
 import './Analytics.css';
 
 const { Option } = Select;
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
+const { TabPane } = Tabs;
+const { RangePicker } = DatePicker;
 
 function Analytics() {
   const { tenantId } = useParams();
@@ -26,6 +33,12 @@ function Analytics() {
   
   // Time range for analytics (default: last 30 days)
   const [timeRange, setTimeRange] = useState('30days');
+  
+  // Active tab for report sections
+  const [activeTab, setActiveTab] = useState('overview');
+  
+  // Custom date range
+  const [customDateRange, setCustomDateRange] = useState(null);
   
   // Ref to track if component is mounted
   const isMounted = useRef(true);
@@ -107,6 +120,22 @@ function Analytics() {
     const now = new Date();
     let rangeStart;
     
+    // Handle custom date range
+    if (timeRange === 'custom' && customDateRange && customDateRange.length === 2) {
+      const [start, end] = customDateRange;
+      return events.filter(event => {
+        try {
+          const eventDate = new Date(event.start);
+          return eventDate >= start.startOf('day').toDate() && 
+                 eventDate <= end.endOf('day').toDate();
+        } catch (e) {
+          console.error('Error parsing event date:', e, event);
+          return false;
+        }
+      });
+    }
+    
+    // Handle predefined ranges
     switch (timeRange) {
       case '7days':
         rangeStart = new Date(now);
@@ -142,12 +171,39 @@ function Analytics() {
 
   // Get the total time period in hours for the selected range
   const getTotalTimePeriodHours = () => {
+    // Handle custom date range
+    if (timeRange === 'custom' && customDateRange && customDateRange.length === 2) {
+      const [start, end] = customDateRange;
+      const diffHours = end.diff(start, 'hours');
+      return diffHours > 0 ? diffHours : 24; // Minimum 1 day
+    }
+    
+    // Handle predefined ranges
     switch (timeRange) {
       case '7days': return 7 * 24;
       case '30days': return 30 * 24;
       case '90days': return 90 * 24;
       case '12months': return 365 * 24;
       default: return 30 * 24;
+    }
+  };
+  
+  // Get number of days in the selected time range
+  const getTimeRangeDays = () => {
+    // Handle custom date range
+    if (timeRange === 'custom' && customDateRange && customDateRange.length === 2) {
+      const [start, end] = customDateRange;
+      const diffDays = end.diff(start, 'days');
+      return diffDays > 0 ? diffDays : 1; // Minimum 1 day
+    }
+    
+    // Handle predefined ranges
+    switch (timeRange) {
+      case '7days': return 7;
+      case '30days': return 30;
+      case '90days': return 90;
+      case '12months': return 365;
+      default: return 30;
     }
   };
 
@@ -175,7 +231,8 @@ function Analytics() {
         avgCost: 0,
         utilizationCount: 0,
         maintenanceCount: 0,
-        brokenCount: 0
+        brokenCount: 0,
+        location: resource.location || 'Unknown'
       }));
     }
     
@@ -219,6 +276,23 @@ function Analytics() {
       const totalCost = resourceEvents.reduce((sum, event) => sum + (Number(event.cost) || 0), 0);
       const avgCost = resourceEvents.length > 0 ? totalCost / resourceEvents.length : 0;
       
+      // Find most common location
+      const locationCounts = {};
+      resourceEvents.forEach(event => {
+        const location = event.location || 'Unknown';
+        locationCounts[location] = (locationCounts[location] || 0) + 1;
+      });
+      
+      let mostCommonLocation = resource.location || 'Unknown';
+      let maxCount = 0;
+      
+      Object.entries(locationCounts).forEach(([location, count]) => {
+        if (count > maxCount) {
+          maxCount = count;
+          mostCommonLocation = location;
+        }
+      });
+      
       return {
         name: resource.title || 'Unknown Equipment',
         id: resource.id,
@@ -235,7 +309,8 @@ function Analytics() {
         avgCost: avgCost,
         utilizationCount: utilizationEvents.length,
         maintenanceCount: maintenanceEvents.length,
-        brokenCount: brokenEvents.length
+        brokenCount: brokenEvents.length,
+        location: mostCommonLocation
       };
     }).sort((a, b) => b.count - a.count);
     
@@ -319,6 +394,8 @@ function Analytics() {
     
     const technicianCounts = {};
     const technicianCosts = {};
+    const technicianHours = {};
+    const technicianPurpose = {};
     
     filteredEvents.forEach(event => {
       if (event.technician) {
@@ -329,19 +406,38 @@ function Analytics() {
         } else {
           technicianCounts[event.technician] = 1;
           technicianCosts[event.technician] = (Number(event.cost) || 0);
+          technicianPurpose[event.technician] = {
+            utilization: 0,
+            maintenance: 0,
+            broken: 0
+          };
+          technicianHours[event.technician] = 0;
         }
+        
+        // Track purpose
+        const purpose = event.purpose || 'Utilization';
+        technicianPurpose[event.technician][purpose.toLowerCase()]++;
+        
+        // Track hours
+        const start = new Date(event.start);
+        const end = new Date(event.end || event.start);
+        const durationHours = (end - start) / (1000 * 60 * 60);
+        technicianHours[event.technician] += (isNaN(durationHours) ? 0 : durationHours);
       }
     });
     
     return Object.entries(technicianCounts)
       .map(([name, count]) => ({ 
-        name, 
+        name,
         count,
         totalCost: technicianCosts[name],
-        avgCost: Math.round(technicianCosts[name] / count)
+        avgCost: Math.round(technicianCosts[name] / count),
+        totalHours: Math.round(technicianHours[name] * 10) / 10,
+        costPerHour: technicianHours[name] > 0 ? 
+          Math.round((technicianCosts[name] / technicianHours[name]) * 10) / 10 : 0,
+        purpose: technicianPurpose[name]
       }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+      .sort((a, b) => b.count - a.count);
   };
 
   // Get monthly event counts
@@ -376,7 +472,7 @@ function Analytics() {
             months[monthIndex].cost += (Number(event.cost) || 0);
           }
         } catch (e) {
-          console.error('Error processing event date:', e, event);
+          console.error('Error parsing event date:', e, event);
         }
       });
     }
@@ -454,17 +550,6 @@ function Analytics() {
     }
     
     return totalHours;
-  };
-
-  // Get number of days in the selected time range
-  const getTimeRangeDays = () => {
-    switch (timeRange) {
-      case '7days': return 7;
-      case '30days': return 30;
-      case '90days': return 90;
-      case '12months': return 365;
-      default: return 30;
-    }
   };
 
   // Format display name for tenant
@@ -614,6 +699,628 @@ function Analytics() {
     setTimeout(() => exportTechnicianCSV(), 500);
     setTimeout(() => exportMonthlyCSV(), 1000);
     setTimeout(() => exportEventsCSV(), 1500);
+    setTimeout(() => exportROIData(), 2000);
+    setTimeout(() => exportDepartmentData(), 2500);
+    setTimeout(() => exportRecommendationsData(), 3000);
+  };
+
+  // ADVANCED ANALYTICS FUNCTIONS
+
+  // Calculate ROI metrics
+  const calculateROI = () => {
+    const filteredEvents = getFilteredEvents();
+    const totalHoursObj = calculateTotalHours();
+    
+    if (filteredEvents.length === 0) {
+      return {
+        totalCost: 0,
+        averageRatePerHour: 0,
+        utilizationRevenue: 0,
+        totalRevenue: 0,
+        totalProfit: 0,
+        roi: 0,
+        paybackPeriodDays: 0,
+        costSavings: 0
+      };
+    }
+    
+    // Get equipment costs
+    const equipmentCosts = {};
+    resources.forEach(resource => {
+      // Default hourly rate for equipment if not specified
+      const hourlyRate = resource.hourlyRate || 100; 
+      const acquisitionCost = resource.acquisitionCost || 50000;
+      const maintenanceCost = resource.maintenanceCost || 5000;
+      
+      equipmentCosts[resource.id] = {
+        hourlyRate,
+        acquisitionCost,
+        maintenanceCost
+      };
+    });
+    
+    // Calculate total revenue based on utilization hours
+    let totalRevenue = 0;
+    let costSavings = 0;
+    
+    // Calculate revenue for each equipment
+    const equipmentUtilization = calculateEquipmentUtilization();
+    equipmentUtilization.forEach(equipment => {
+      const equipmentCost = equipmentCosts[equipment.id] || {
+        hourlyRate: 100,
+        acquisitionCost: 50000,
+        maintenanceCost: 5000
+      };
+      
+      // Calculate revenue from actual utilization
+      const revenue = equipment.utilizationHours * equipmentCost.hourlyRate;
+      totalRevenue += revenue;
+      
+      // Calculate potential revenue if equipment was utilized at 85% (excluding maintenance and broken time)
+      const potentialHours = getTotalTimePeriodHours() * 0.85;
+      const actualUtilizationHours = equipment.utilizationHours;
+      
+      // Calculate cost of outsourcing the additional utilized hours
+      const externalServiceRate = equipmentCost.hourlyRate * 1.5; // External service costs 50% more
+      costSavings += actualUtilizationHours * (externalServiceRate - equipmentCost.hourlyRate);
+    });
+    
+    // Calculate total costs
+    const totalCost = filteredEvents.reduce((sum, event) => {
+      return sum + (Number(event.cost) || 0);
+    }, 0);
+    
+    // Add fixed costs (approximation)
+    const fixedCosts = resources.reduce((sum, resource) => {
+      const equipmentCost = equipmentCosts[resource.id] || {
+        maintenanceCost: 5000
+      };
+      // Calculate prorated maintenance cost for the time period
+      const days = getTimeRangeDays();
+      const yearFraction = days / 365;
+      return sum + (equipmentCost.maintenanceCost * yearFraction);
+    }, 0);
+    
+    const adjustedTotalCost = totalCost + fixedCosts;
+    
+    // Calculate profit
+    const totalProfit = totalRevenue - adjustedTotalCost;
+    
+    // Calculate ROI
+    const roi = adjustedTotalCost > 0 ? (totalProfit / adjustedTotalCost) * 100 : 0;
+    
+    // Calculate average rate per hour
+    const totalUtilizationHours = totalHoursObj.utilizationHours || 1; // Avoid division by zero
+    const averageRatePerHour = totalRevenue / totalUtilizationHours;
+    
+    // Calculate payback period (days) based on acquisition costs
+    const totalAcquisitionCost = resources.reduce((sum, resource) => {
+      const equipmentCost = equipmentCosts[resource.id] || {
+        acquisitionCost: 50000
+      };
+      return sum + equipmentCost.acquisitionCost;
+    }, 0);
+    
+    // Daily profit
+    const dailyProfit = totalProfit / getTimeRangeDays();
+    const paybackPeriodDays = dailyProfit > 0 ? Math.round(totalAcquisitionCost / dailyProfit) : 9999;
+    
+    return {
+      totalCost: adjustedTotalCost,
+      averageRatePerHour,
+      utilizationRevenue: totalRevenue,
+      totalRevenue,
+      totalProfit,
+      roi,
+      paybackPeriodDays,
+      costSavings
+    };
+  };
+
+  // Get utilization targets
+  const getUtilizationTargets = () => {
+    // In a real implementation, these would come from the database or user settings
+    const targets = {
+      overall: 80, // 80% overall utilization target
+      equipment: {
+        // Equipment-specific targets
+        // Default to 75% if not specified
+        default: 75
+      },
+      departments: {
+        // Department-specific targets
+        'R&D': 85,
+        'QA': 80,
+        'Manufacturing': 90,
+        default: 75
+      }
+    };
+    
+    // Get equipment-specific targets
+    resources.forEach(resource => {
+      // Set target based on equipment type or role
+      if (resource.title && (resource.title.includes('GCMS') || resource.title.includes('HPLC'))) {
+        targets.equipment[resource.id] = 85; // Higher targets for expensive analytical equipment
+      } else if (resource.title && resource.title.includes('Microscope')) {
+        targets.equipment[resource.id] = 70; // Lower targets for shared basic equipment
+      } else {
+        targets.equipment[resource.id] = targets.equipment.default;
+      }
+    });
+    
+    return targets;
+  };
+
+  // Calculate performance vs targets
+  const calculateTargetPerformance = () => {
+    const targets = getUtilizationTargets();
+    const equipment = calculateEquipmentUtilization();
+    
+    const performanceData = equipment.map(item => {
+      const target = targets.equipment[item.id] || targets.equipment.default;
+      const utilizationPercent = Math.round((item.utilizationHours / getTotalTimePeriodHours()) * 100);
+      
+      return {
+        ...item,
+        targetUtilization: target,
+        actualUtilization: utilizationPercent,
+        gap: utilizationPercent - target,
+        status: 
+          utilizationPercent >= target ? 'above' :
+          utilizationPercent >= target * 0.9 ? 'close' : 'below',
+        improvement: item.count > 0 ? 
+          Math.round((utilizationPercent / (targets.equipment.default * 0.8)) * 100) : 0
+      };
+    });
+    
+    // Calculate overall performance
+    const totalHoursObj = calculateTotalHours();
+    const overallUtilizationPercent = Math.round((totalHoursObj.utilizationHours / totalHoursObj.totalHours) * 100);
+    
+    const overallPerformance = {
+      targetUtilization: targets.overall,
+      actualUtilization: overallUtilizationPercent,
+      gap: overallUtilizationPercent - targets.overall,
+      status: 
+        overallUtilizationPercent >= targets.overall ? 'above' :
+        overallUtilizationPercent >= targets.overall * 0.9 ? 'close' : 'below'
+    };
+    
+    return {
+      equipment: performanceData,
+      overall: overallPerformance
+    };
+  };
+
+  // Calculate department comparisons
+  const calculateDepartmentComparisons = () => {
+    // In a real implementation, departments would be fetched from the database
+    // For demo purposes, we'll infer departments from locations or other properties
+    
+    const departments = [
+      { id: 1, name: 'R&D', locations: ['R&D', 'Laboratory A1', 'Laboratory Center'] },
+      { id: 2, name: 'QA', locations: ['Cupboard Lab A1', 'Shelf A1'] },
+      { id: 3, name: 'Manufacturing', locations: ['Manufacturing Plant'] },
+      { id: 4, name: 'Research', locations: ['Cupboard A', 'Cupboard B'] },
+      { id: 5, name: 'External', locations: ['Isidora Co loc 1', 'Test Location'] },
+    ];
+    
+    const filteredEvents = getFilteredEvents();
+    
+    // Initialize department data
+    const departmentData = departments.map(dept => ({
+      ...dept,
+      eventCount: 0,
+      utilizationHours: 0,
+      maintenanceHours: 0,
+      brokenHours: 0,
+      totalHours: 0,
+      equipmentCount: 0,
+      utilizationPercent: 0,
+      resourceEfficiency: 0,
+      costPerHour: 0,
+      totalCost: 0,
+      uniqueUsers: new Set()
+    }));
+    
+    // Assign events to departments based on location
+    filteredEvents.forEach(event => {
+      // Get the location
+      const location = event.location || '';
+      
+      // Find matching department
+      const departmentIndex = departmentData.findIndex(dept => 
+        dept.locations.some(loc => location.includes(loc))
+      );
+      
+      if (departmentIndex >= 0) {
+        const department = departmentData[departmentIndex];
+        
+        // Calculate event duration
+        const start = new Date(event.start);
+        const end = new Date(event.end || event.start);
+        const durationHours = (end - start) / (1000 * 60 * 60);
+        
+        // Update department metrics
+        department.eventCount++;
+        
+        if (event.purpose === 'Maintenance') {
+          department.maintenanceHours += durationHours;
+        } else if (event.purpose === 'Broken') {
+          department.brokenHours += durationHours;
+        } else {
+          department.utilizationHours += durationHours;
+        }
+        
+        department.totalHours += durationHours;
+        department.totalCost += (Number(event.cost) || 0);
+        
+        // Track unique equipment
+        const resourceId = event.resourceId || event.equipment;
+        if (resourceId && !department.uniqueEquipment) {
+          department.uniqueEquipment = new Set();
+        }
+        if (resourceId) {
+          department.uniqueEquipment.add(resourceId);
+        }
+        
+        // Track unique users
+        if (event.technician) {
+          department.uniqueUsers.add(event.technician);
+        }
+      }
+    });
+    
+    // Calculate derived metrics for each department
+    departmentData.forEach(dept => {
+      // Convert sets to counts
+      dept.equipmentCount = dept.uniqueEquipment ? dept.uniqueEquipment.size : 0;
+      dept.userCount = dept.uniqueUsers.size;
+      
+      // Clean up sets (not needed in final output)
+      delete dept.uniqueEquipment;
+      delete dept.uniqueUsers;
+      
+      // Calculate utilization percentage
+      dept.utilizationPercent = dept.totalHours > 0 
+        ? Math.round((dept.utilizationHours / dept.totalHours) * 100) 
+        : 0;
+      
+      // Calculate resource efficiency (events per equipment)
+      dept.resourceEfficiency = dept.equipmentCount > 0 
+        ? Math.round((dept.eventCount / dept.equipmentCount) * 10) / 10 
+        : 0;
+      
+      // Calculate cost per hour
+      dept.costPerHour = dept.utilizationHours > 0 
+        ? Math.round((dept.totalCost / dept.utilizationHours) * 100) / 100 
+        : 0;
+      
+      // Round hours to 2 decimal places
+      dept.utilizationHours = Math.round(dept.utilizationHours * 100) / 100;
+      dept.maintenanceHours = Math.round(dept.maintenanceHours * 100) / 100;
+      dept.brokenHours = Math.round(dept.brokenHours * 100) / 100;
+      dept.totalHours = Math.round(dept.totalHours * 100) / 100;
+    });
+    
+    // Sort departments by utilization hours (descending)
+    return departmentData.sort((a, b) => b.utilizationHours - a.utilizationHours);
+  };
+
+  // Analyze time distribution of equipment usage
+  const analyzeTimeDistribution = () => {
+    const filteredEvents = getFilteredEvents();
+    
+    if (filteredEvents.length === 0) {
+      return {
+        morning: 0,
+        afternoon: 0,
+        evening: 0
+      };
+    }
+    
+    // Count events by time of day
+    let morning = 0; // 6:00 - 12:00
+    let afternoon = 0; // 12:00 - 18:00
+    let evening = 0; // 18:00 - 24:00
+    
+    filteredEvents.forEach(event => {
+      try {
+        const startDate = new Date(event.start);
+        const hour = startDate.getHours();
+        
+        if (hour >= 6 && hour < 12) {
+          morning++;
+        } else if (hour >= 12 && hour < 18) {
+          afternoon++;
+        } else {
+          evening++;
+        }
+      } catch (e) {
+        console.error('Error parsing event date:', e, event);
+      }
+    });
+    
+    return {
+      morning,
+      afternoon,
+      evening,
+      total: morning + afternoon + evening
+    };
+  };
+
+  // Generate optimization recommendations
+  const generateOptimizationRecommendations = () => {
+    const equipment = calculateEquipmentUtilization();
+    const targetPerformance = calculateTargetPerformance();
+    const departmentComparisons = calculateDepartmentComparisons();
+    const roiData = calculateROI();
+    
+    // Initialize recommendations array
+    const recommendations = [];
+    
+    // 1. Identify underutilized equipment (utilization < 30%)
+    const underutilizedEquipment = equipment
+      .filter(item => (item.utilizationHours / getTotalTimePeriodHours()) * 100 < 30)
+      .sort((a, b) => a.utilizationHours - b.utilizationHours);
+    
+    if (underutilizedEquipment.length > 0) {
+      recommendations.push({
+        id: 'under-utilization',
+        type: 'warning',
+        priority: 'high',
+        title: 'Underutilized Equipment',
+        description: `${underutilizedEquipment.length} pieces of equipment are utilized less than 30% of available time.`,
+        details: `Consider consolidating usage or repurposing: ${underutilizedEquipment.slice(0, 3).map(e => e.name).join(', ')}${underutilizedEquipment.length > 3 ? '...' : ''}`,
+        impact: 'High cost savings potential',
+        savings: formatCurrency(underutilizedEquipment.reduce((sum, item) => sum + (item.avgCost || 0) * 10, 0))
+      });
+    }
+    
+    // 2. Identify equipment with high maintenance hours (> 15%)
+    const highMaintenanceEquipment = equipment
+      .filter(item => (item.maintenanceHours / getTotalTimePeriodHours()) * 100 > 15)
+      .sort((a, b) => b.maintenanceHours - a.maintenanceHours);
+    
+    if (highMaintenanceEquipment.length > 0) {
+      recommendations.push({
+        id: 'high-maintenance',
+        type: 'alert',
+        priority: 'medium',
+        title: 'High Maintenance Equipment',
+        description: `${highMaintenanceEquipment.length} pieces of equipment require excessive maintenance.`,
+        details: `Consider service contracts or replacement: ${highMaintenanceEquipment.slice(0, 3).map(e => e.name).join(', ')}`,
+        impact: 'Reduces downtime and increases availability',
+        savings: formatCurrency(highMaintenanceEquipment.reduce((sum, item) => sum + item.maintenanceHours * 150, 0))
+      });
+    }
+    
+    // 3. Analyze department utilization imbalances
+    const departmentUtilization = departmentComparisons.map(dept => ({
+      name: dept.name,
+      utilizationPercent: dept.utilizationPercent
+    }));
+    
+    const validDepartments = departmentUtilization.filter(dept => dept.utilizationPercent > 0);
+    
+    if (validDepartments.length >= 2) {
+      const maxUtilDept = validDepartments.reduce((max, dept) => 
+        dept.utilizationPercent > max.utilizationPercent ? dept : max, 
+        { utilizationPercent: 0 }
+      );
+      
+      const minUtilDept = validDepartments.reduce((min, dept) => 
+        (dept.utilizationPercent < min.utilizationPercent) ? dept : min, 
+        { utilizationPercent: 100 }
+      );
+      
+      if (maxUtilDept.utilizationPercent - minUtilDept.utilizationPercent > 30) {
+        recommendations.push({
+          id: 'dept-imbalance',
+          type: 'info',
+          priority: 'medium',
+          title: 'Department Utilization Imbalance',
+          description: `Significant imbalance between ${maxUtilDept.name} (${maxUtilDept.utilizationPercent}%) and ${minUtilDept.name} (${minUtilDept.utilizationPercent}%).`,
+          details: 'Consider redistributing equipment or cross-department scheduling to balance utilization.',
+          impact: 'Improved resource distribution and higher overall efficiency',
+          savings: 'Variable'
+        });
+      }
+    }
+    
+    // 4. Equipment clustering recommendation
+    const locationDistribution = {};
+    equipment.forEach(item => {
+      const location = item.location || 'Unknown';
+      if (!locationDistribution[location]) {
+        locationDistribution[location] = {
+          count: 0,
+          utilizationHours: 0
+        };
+      }
+      locationDistribution[location].count++;
+      locationDistribution[location].utilizationHours += item.utilizationHours;
+    });
+    
+    const locationsWithSingleEquipment = Object.entries(locationDistribution)
+      .filter(([_, data]) => data.count === 1 && data.utilizationHours > 0)
+      .map(([location]) => location);
+    
+    if (locationsWithSingleEquipment.length > 2) {
+      recommendations.push({
+        id: 'equipment-clustering',
+        type: 'suggestion',
+        priority: 'low',
+        title: 'Equipment Clustering Opportunity',
+        description: `${locationsWithSingleEquipment.length} locations have only a single piece of equipment.`,
+        details: 'Consider centralizing equipment into fewer locations to improve accessibility and management.',
+        impact: 'Reduced overhead and improved space utilization',
+        savings: formatCurrency(locationsWithSingleEquipment.length * 5000)
+      });
+    }
+    
+    // 5. Scheduling optimization potential
+    const timeDistribution = analyzeTimeDistribution();
+    const hasSignificantTimeSkew = 
+      (timeDistribution.morning > timeDistribution.afternoon * 2) || 
+      (timeDistribution.afternoon > timeDistribution.morning * 2);
+    
+    if (hasSignificantTimeSkew) {
+      const peakTime = timeDistribution.morning > timeDistribution.afternoon ? 'mornings' : 'afternoons';
+      recommendations.push({
+        id: 'schedule-optimization',
+        type: 'suggestion',
+        priority: 'medium',
+        title: 'Scheduling Optimization',
+        description: `Usage is heavily skewed toward ${peakTime}.`,
+        details: 'Implement staggered scheduling to distribute equipment usage more evenly throughout the day.',
+        impact: 'Increased equipment availability and reduced wait times',
+        savings: 'Improved throughput (~15%)'
+      });
+    }
+    
+    // 6. ROI-based equipment investment recommendation
+    if (roiData.roi > 50) {
+      const highRoiEquipment = equipment
+        .filter(item => (item.utilizationHours / getTotalTimePeriodHours()) * 100 > 75)
+        .sort((a, b) => b.utilizationHours - a.utilizationHours);
+      
+      if (highRoiEquipment.length > 0) {
+        recommendations.push({
+          id: 'expansion-opportunity',
+          type: 'opportunity',
+          priority: 'high',
+          title: 'Expansion Opportunity',
+          description: `High ROI (${Math.round(roiData.roi)}%) justifies equipment investment.`,
+          details: `Consider purchasing additional units of: ${highRoiEquipment.slice(0, 2).map(e => e.name).join(', ')}`,
+          impact: 'Increased capacity and revenue generation',
+          savings: 'Revenue potential: ' + formatCurrency(highRoiEquipment.reduce((sum, item) => sum + item.utilizationHours * 150, 0))
+        });
+      }
+    }
+    
+    // 7. Cross-training recommendation
+    const technicianData = getTopTechnicians();
+    if (technicianData.length >= 2) {
+      const hasUserImbalance = technicianData[0].count > (technicianData[technicianData.length - 1].count * 3);
+      
+      if (hasUserImbalance) {
+        recommendations.push({
+          id: 'cross-training',
+          type: 'suggestion',
+          priority: 'medium',
+          title: 'Cross-Training Opportunity',
+          description: 'Significant imbalance in equipment usage among technicians.',
+          details: 'Implement cross-training program to distribute expertise and equipment usage more evenly.',
+          impact: 'Reduced bottlenecks and dependency on key personnel',
+          savings: 'Risk mitigation and improved flexibility'
+        });
+      }
+    }
+    
+    // Sort recommendations by priority
+    const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
+    return recommendations.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+  };
+
+  // Calculate overall efficiency score (0-100)
+  const calculateEfficiencyScore = () => {
+    const totalHoursObj = calculateTotalHours();
+    const targetPerformance = calculateTargetPerformance();
+    const roiData = calculateROI();
+    
+    // Components of the score
+    const utilizationScore = Math.min(100, (totalHoursObj.utilizationPercent / targetPerformance.overall.targetUtilization) * 80);
+    const downtimeScore = Math.min(100, (100 - totalHoursObj.downtimePercent) / 95 * 90);
+    const roiScore = Math.min(100, (roiData.roi / 40) * 70);
+    
+    // Weighted average
+    const overallScore = Math.round(
+      (utilizationScore * 0.5) +
+      (downtimeScore * 0.3) +
+      (roiScore * 0.2)
+    );
+    
+    return Math.min(100, Math.max(0, overallScore));
+  };
+
+  // Export ROI data to CSV
+  const exportROIData = () => {
+    const roiData = calculateROI();
+    const data = [
+      {
+        metric: 'Total Revenue',
+        value: formatCurrency(roiData.utilizationRevenue)
+      },
+      {
+        metric: 'Total Cost',
+        value: formatCurrency(roiData.totalCost)
+      },
+      {
+        metric: 'Net Profit',
+        value: formatCurrency(roiData.totalProfit)
+      },
+      {
+        metric: 'ROI',
+        value: `${Math.round(roiData.roi * 10) / 10}%`
+      },
+      {
+        metric: 'Average Rate Per Hour',
+        value: formatCurrency(roiData.averageRatePerHour)
+      },
+      {
+        metric: 'Cost Savings',
+        value: formatCurrency(roiData.costSavings)
+      },
+      {
+        metric: 'Payback Period',
+        value: `${roiData.paybackPeriodDays} days`
+      }
+    ];
+    
+    const columns = [
+      { title: 'Metric', dataIndex: 'metric' },
+      { title: 'Value', dataIndex: 'value' }
+    ];
+    
+    const csvContent = generateCSV(data, columns);
+    downloadCSV(csvContent, `roi-analysis-${timeRange}.csv`);
+  };
+
+  // Export department data to CSV
+  const exportDepartmentData = () => {
+    const data = calculateDepartmentComparisons();
+    const columns = [
+      { title: 'Department', dataIndex: 'name' },
+      { title: 'Equipment Count', dataIndex: 'equipmentCount' },
+      { title: 'Reservations', dataIndex: 'eventCount' },
+      { title: 'Utilization Hours', key: 'utilizationHours', render: (value) => formatHours(value) },
+      { title: 'Maintenance Hours', key: 'maintenanceHours', render: (value) => formatHours(value) },
+      { title: 'Broken Hours', key: 'brokenHours', render: (value) => formatHours(value) },
+      { title: 'Utilization %', key: 'utilizationPercent', render: (value) => `${value}%` },
+      { title: 'Resource Efficiency', dataIndex: 'resourceEfficiency' },
+      { title: 'Cost/Hour', key: 'costPerHour', render: (value) => formatCurrency(value) },
+      { title: 'Total Cost', key: 'totalCost', render: (value) => formatCurrency(value) }
+    ];
+    
+    const csvContent = generateCSV(data, columns);
+    downloadCSV(csvContent, `department-comparison-${timeRange}.csv`);
+  };
+
+  // Export optimization recommendations to CSV
+  const exportRecommendationsData = () => {
+    const data = generateOptimizationRecommendations();
+    const columns = [
+      { title: 'Priority', dataIndex: 'priority' },
+      { title: 'Recommendation', dataIndex: 'title' },
+      { title: 'Description', dataIndex: 'description' },
+      { title: 'Details', dataIndex: 'details' },
+      { title: 'Impact', dataIndex: 'impact' },
+      { title: 'Potential Value', dataIndex: 'savings' }
+    ];
+    
+    const csvContent = generateCSV(data, columns);
+    downloadCSV(csvContent, `optimization-recommendations-${timeRange}.csv`);
   };
 
   // Data for charts and tables
@@ -624,6 +1331,11 @@ function Analytics() {
   const purposeBreakdown = calculatePurposeBreakdown();
   const costMetrics = calculateCostMetrics();
   const totalHours = calculateTotalHours();
+  const roiData = calculateROI();
+  const efficiencyScore = calculateEfficiencyScore();
+  const departmentData = calculateDepartmentComparisons();
+  const targetPerformance = calculateTargetPerformance();
+  const recommendations = generateOptimizationRecommendations();
 
   // Table columns for Equipment Utilization
   const equipmentColumns = [
@@ -767,415 +1479,49 @@ function Analytics() {
     },
   ];
 
-  // Calculate data for the Instrument bar chart
-  const equipmentBarChartData = equipmentUtilization.slice(0, 10).map(item => ({
-    name: item.name,
-    utilization: item.utilizationHours,
-    maintenance: item.maintenanceHours,
-    broken: item.brokenHours,
-    idle: item.idleHours
-  }));
-
-  // Calculate data for the Up vs Down bar chart
-  const uptimeDowntimeData = [
-    { name: 'Uptime', hours: totalHours.utilizationHours + totalHours.idleHours, percent: totalHours.uptimePercent },
-    { name: 'Downtime', hours: totalHours.maintenanceHours + totalHours.brokenHours, percent: totalHours.downtimePercent },
+  // Department table columns
+  const departmentColumns = [
+    {
+      title: 'Department',
+      dataIndex: 'name',
+      key: 'name',
+      sorter: (a, b) => a.name.localeCompare(b.name),
+    },
+    {
+      title: 'Equipment',
+      dataIndex: 'equipmentCount',
+      key: 'equipmentCount',
+      sorter: (a, b) => a.equipmentCount - b.equipmentCount,
+    },
+    {
+      title: 'Reservations',
+      dataIndex: 'eventCount',
+      key: 'eventCount',
+      sorter: (a, b) => a.eventCount - b.eventCount,
+    },
+    {
+      title: 'Utilization [h]',
+      key: 'utilizationHours',
+      render: (_, record) => formatHours(record.utilizationHours),
+      sorter: (a, b) => a.utilizationHours - b.utilizationHours,
+    },
+    {
+      title: 'Utilization [%]',
+      key: 'utilizationPercent',
+      render: (_, record) => `${record.utilizationPercent}%`,
+      sorter: (a, b) => a.utilizationPercent - b.utilizationPercent,
+    },
+    {
+      title: 'Efficiency',
+      dataIndex: 'resourceEfficiency',
+      key: 'resourceEfficiency',
+      sorter: (a, b) => a.resourceEfficiency - b.resourceEfficiency,
+      render: (value) => value.toFixed(1),
+    },
+    {
+      title: 'Cost/Hour',
+      key: 'costPerHour',
+      render: (_, record) => formatCurrency(record.costPerHour),
+      sorter: (a, b) => a.costPerHour - b.costPerHour,
+    },
   ];
-
-  // Export dropdown menu
-  const exportMenu = (
-    <Menu>
-      <Menu.Item key="csv-equipment" onClick={exportEquipmentCSV}>
-        <FileExcelOutlined /> Equipment Utilization Data
-      </Menu.Item>
-      <Menu.Item key="csv-technicians" onClick={exportTechnicianCSV}>
-        <FileExcelOutlined /> Technician Data
-      </Menu.Item>
-      <Menu.Item key="csv-monthly" onClick={exportMonthlyCSV}>
-        <FileExcelOutlined /> Monthly Trends
-      </Menu.Item>
-      <Menu.Item key="csv-events" onClick={exportEventsCSV}>
-        <FileExcelOutlined /> Event Data
-      </Menu.Item>
-      <Menu.Divider />
-      <Menu.Item key="csv-all" onClick={exportFullReport}>
-        <FileExcelOutlined /> Export All Data
-      </Menu.Item>
-    </Menu>
-  );
-
-  return (
-    <div className="analytics-container">
-      <Card className="header-card">
-        <div className="header-content">
-          <Title level={3}>{getDisplayName()} - Equipment Utilization Report</Title>
-          <div className="header-actions">
-            <Dropdown overlay={exportMenu} placement="bottomRight">
-              <Button icon={<DownloadOutlined />}>
-                Export Reports
-              </Button>
-            </Dropdown>
-            <Button 
-              type="primary"
-              icon={<CalendarOutlined />}
-              onClick={() => navigate(`/${tenantId}`)}
-            >
-              Calendar View
-            </Button>
-          </div>
-        </div>
-      </Card>
-      
-      {loading ? (
-        <Card>
-          <div className="loading-container">
-            <Spin size="large" tip="Loading analytics data..." />
-          </div>
-        </Card>
-      ) : error ? (
-        <Card>
-          <Alert
-            message="Error Loading Analytics"
-            description={error}
-            type="error"
-            showIcon
-            action={
-              <Button onClick={() => navigate('/')} type="primary">
-                Return to Main Dashboard
-              </Button>
-            }
-          />
-        </Card>
-      ) : (
-        <div className="analytics-content">
-          <Card className="filter-card">
-            <div className="date-range-picker">
-              <Text strong>Report Time Period:</Text>
-              <Select 
-                value={timeRange}
-                onChange={(value) => setTimeRange(value)}
-                style={{ width: 150 }}
-              >
-                <Option value="7days">Last 7 Days</Option>
-                <Option value="30days">Last 30 Days</Option>
-                <Option value="90days">Last 90 Days</Option>
-                <Option value="12months">Last 12 Months</Option>
-              </Select>
-            </div>
-          </Card>
-          
-          {/* Overall Summary Stats */}
-          <Row gutter={16} className="stats-row">
-            <Col xs={24} sm={12} md={6}>
-              <Card>
-                <Statistic
-                  title="Total Equipment"
-                  value={resources.length}
-                  prefix={<BarChartOutlined />}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card>
-                <Statistic
-                  title="Active Equipment"
-                  value={equipmentUtilization.filter(e => e.count > 0).length}
-                  suffix={`/ ${resources.length}`}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card>
-                <Statistic
-                  title="Uptime %"
-                  value={totalHours.uptimePercent}
-                  suffix="%"
-                  valueStyle={{ color: totalHours.uptimePercent > 75 ? '#3f8600' : '#faad14' }}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card>
-                <Statistic
-                  title="Downtime %"
-                  value={totalHours.downtimePercent}
-                  suffix="%"
-                  valueStyle={{ color: totalHours.downtimePercent < 25 ? '#3f8600' : '#f5222d' }}
-                />
-              </Card>
-            </Col>
-          </Row>
-          
-          {/* Time Distribution Section */}
-          <Card 
-            title="Equipment Time Distribution" 
-            className="section-card"
-            extra={
-              <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportEquipmentCSV()}>
-                Export
-              </Button>
-            }
-          >
-            <Row gutter={16}>
-              <Col xs={24} md={12}>
-                <Card bordered={false} className="hour-stats-card">
-                  <Row gutter={16}>
-                    <Col span={12}>
-                      <Statistic
-                        title="Total Utilization [h]"
-                        value={formatHours(totalHours.utilizationHours)}
-                        prefix={<BarChartOutlined style={{ color: '#1890ff' }} />}
-                      />
-                    </Col>
-                    <Col span={12}>
-                      <Statistic
-                        title="Total Maintenance [h]"
-                        value={formatHours(totalHours.maintenanceHours)}
-                        prefix={<ExclamationOutlined style={{ color: '#faad14' }} />}
-                      />
-                    </Col>
-                  </Row>
-                  <Row gutter={16} style={{ marginTop: '20px' }}>
-                    <Col span={12}>
-                      <Statistic
-                        title="Total Broken [h]"
-                        value={formatHours(totalHours.brokenHours)}
-                        prefix={<CloseCircleOutlined style={{ color: '#f5222d' }} />}
-                      />
-                    </Col>
-                    <Col span={12}>
-                      <Statistic
-                        title="Total Idle [h]"
-                        value={formatHours(totalHours.idleHours)}
-                        prefix={<ClockCircleOutlined style={{ color: '#52c41a' }} />}
-                      />
-                    </Col>
-                  </Row>
-                </Card>
-              </Col>
-              <Col xs={24} md={12}>
-                <div className="uptime-downtime-chart">
-                  <h4>Uptime vs Downtime</h4>
-                  <div className="bar-chart-container">
-                    <div className="stacked-bar">
-                      <div 
-                        className="bar-segment uptime" 
-                        style={{ width: `${totalHours.uptimePercent}%` }}
-                      >
-                        Uptime: {totalHours.uptimePercent}%
-                      </div>
-                      <div 
-                        className="bar-segment downtime" 
-                        style={{ width: `${totalHours.downtimePercent}%` }}
-                      >
-                        Downtime: {totalHours.downtimePercent}%
-                      </div>
-                    </div>
-                    <div className="bar-legend">
-                      <div className="legend-item">
-                        <div className="color-box uptime"></div>
-                        <span>Uptime (Utilization + Idle): {formatHours(totalHours.utilizationHours + totalHours.idleHours)}</span>
-                      </div>
-                      <div className="legend-item">
-                        <div className="color-box downtime"></div>
-                        <span>Downtime (Maintenance + Broken): {formatHours(totalHours.maintenanceHours + totalHours.brokenHours)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Col>
-            </Row>
-          </Card>
-          
-          {/* Equipment Utilization Table */}
-          <Card 
-            title="Equipment Utilization Report" 
-            className="section-card"
-            extra={
-              <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportEquipmentCSV()}>
-                Export
-              </Button>
-            }
-          >
-            <Table 
-              dataSource={equipmentUtilization} 
-              columns={equipmentColumns}
-              rowKey="id"
-              pagination={{ pageSize: 10 }}
-              summary={pageData => {
-                let totalUtilizationHours = 0;
-                let totalMaintenanceHours = 0;
-                let totalBrokenHours = 0;
-                let totalIdleHours = 0;
-                
-                pageData.forEach(({ utilizationHours, maintenanceHours, brokenHours, idleHours }) => {
-                  totalUtilizationHours += utilizationHours || 0;
-                  totalMaintenanceHours += maintenanceHours || 0;
-                  totalBrokenHours += brokenHours || 0;
-                  totalIdleHours += idleHours || 0;
-                });
-                
-                // Calculate total uptime and downtime for the table
-                const totalHours = totalUtilizationHours + totalMaintenanceHours + totalBrokenHours + totalIdleHours;
-                const uptimePercent = totalHours > 0 
-                  ? Math.round(((totalUtilizationHours + totalIdleHours) / totalHours) * 100) 
-                  : 0;
-                const downtimePercent = totalHours > 0 
-                  ? Math.round(((totalMaintenanceHours + totalBrokenHours) / totalHours) * 100) 
-                  : 0;
-                
-                return (
-                  <>
-                    <Table.Summary.Row className="font-bold">
-                      <Table.Summary.Cell index={0}>Total</Table.Summary.Cell>
-                      <Table.Summary.Cell index={1}>{formatHours(totalUtilizationHours)}</Table.Summary.Cell>
-                      <Table.Summary.Cell index={2}>{formatHours(totalMaintenanceHours)}</Table.Summary.Cell>
-                      <Table.Summary.Cell index={3}>{formatHours(totalBrokenHours)}</Table.Summary.Cell>
-                      <Table.Summary.Cell index={4}>{formatHours(totalIdleHours)}</Table.Summary.Cell>
-                      <Table.Summary.Cell index={5}>{uptimePercent}%</Table.Summary.Cell>
-                      <Table.Summary.Cell index={6}>{downtimePercent}%</Table.Summary.Cell>
-                    </Table.Summary.Row>
-                  </>
-                );
-              }}
-              locale={{
-                emptyText: (
-                  <div style={{ padding: '20px 0' }}>
-                    <Text type="secondary">No equipment utilization data available</Text>
-                  </div>
-                )
-              }}
-            />
-          </Card>
-          
-          {/* Equipment Utilization Bar Chart */}
-          <Card 
-            title="Instrument Utilization Chart" 
-            className="section-card"
-          >
-            <div className="instrument-bar-chart">
-              {equipmentBarChartData.map((item, index) => (
-                <div key={index} className="equipment-bar-container">
-                  <div className="equipment-name">{item.name}</div>
-                  <div className="equipment-bar">
-                    <div 
-                      className="bar-segment utilization" 
-                      style={{ width: `${(item.utilization / (item.utilization + item.maintenance + item.broken + item.idle)) * 100}%` }}
-                      title={`Utilization: ${formatHours(item.utilization)}`}
-                    ></div>
-                    <div 
-                      className="bar-segment maintenance" 
-                      style={{ width: `${(item.maintenance / (item.utilization + item.maintenance + item.broken + item.idle)) * 100}%` }}
-                      title={`Maintenance: ${formatHours(item.maintenance)}`}
-                    ></div>
-                    <div 
-                      className="bar-segment broken" 
-                      style={{ width: `${(item.broken / (item.utilization + item.maintenance + item.broken + item.idle)) * 100}%` }}
-                      title={`Broken: ${formatHours(item.broken)}`}
-                    ></div>
-                    <div 
-                      className="bar-segment idle" 
-                      style={{ width: `${(item.idle / (item.utilization + item.maintenance + item.broken + item.idle)) * 100}%` }}
-                      title={`Idle: ${formatHours(item.idle)}`}
-                    ></div>
-                  </div>
-                  <div className="equipment-hours">
-                    {formatHours(item.utilization + item.maintenance + item.broken + item.idle)}
-                  </div>
-                </div>
-              ))}
-              <div className="bar-chart-legend">
-                <div className="legend-item">
-                  <div className="color-box utilization"></div>
-                  <span>Utilization</span>
-                </div>
-                <div className="legend-item">
-                  <div className="color-box maintenance"></div>
-                  <span>Maintenance</span>
-                </div>
-                <div className="legend-item">
-                  <div className="color-box broken"></div>
-                  <span>Broken</span>
-                </div>
-                <div className="legend-item">
-                  <div className="color-box idle"></div>
-                  <span>Idle</span>
-                </div>
-              </div>
-            </div>
-          </Card>
-          
-          {/* Top Technicians Section */}
-          <Card 
-            title="Top Technicians" 
-            className="section-card"
-            extra={
-              <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportTechnicianCSV()}>
-                Export
-              </Button>
-            }
-          >
-            <Table 
-              dataSource={topTechnicians} 
-              columns={technicianColumns}
-              rowKey="name"
-              pagination={false}
-              locale={{
-                emptyText: (
-                  <div style={{ padding: '20px 0' }}>
-                    <Text type="secondary">No technician data available</Text>
-                  </div>
-                )
-              }}
-            />
-          </Card>
-          
-          {/* Monthly Trends Section */}
-          <Card 
-            title="Monthly Trends" 
-            className="section-card"
-            extra={
-              <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportMonthlyCSV()}>
-                Export
-              </Button>
-            }
-          >
-            <Table 
-              dataSource={monthlyEventCounts} 
-              columns={monthlyColumns}
-              rowKey={(record) => `${record.month}-${record.year}`}
-              pagination={false}
-            />
-          </Card>
-          
-          {/* Recent Reservations Section */}
-          <Card 
-            title="Recent Reservations" 
-            className="section-card"
-            extra={
-              <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportEventsCSV()}>
-                Export
-              </Button>
-            }
-          >
-            <Table 
-              dataSource={getFilteredEvents().slice(0, 10)} 
-              columns={recentEventsColumns}
-              rowKey="id"
-              pagination={false}
-              locale={{
-                emptyText: (
-                  <div style={{ padding: '20px 0' }}>
-                    <Text type="secondary">No reservations found in the selected time period</Text>
-                  </div>
-                )
-              }}
-            />
-          </Card>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default Analytics;
