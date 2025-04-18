@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Card, Row, Col, Button, Typography, Select, DatePicker, Spin, 
+import dayjs from 'dayjs'; // Import dayjs
+import {
+  Card, Row, Col, Button, Typography, Select, DatePicker, Spin,
   Alert, Space, Table, Tag, Tooltip, Statistic, Tabs, Progress
 } from 'antd';
-import { 
-  CalendarOutlined, BarChartOutlined, LineChartOutlined, 
-  FireOutlined, CheckCircleOutlined, ExclamationOutlined, 
+import {
+  CalendarOutlined, BarChartOutlined, LineChartOutlined,
+  FireOutlined, CheckCircleOutlined, ExclamationOutlined,
   CloseCircleOutlined, WarningOutlined, ReloadOutlined
 } from '@ant-design/icons';
 import { fetchTenant } from '../services/apiClient';
@@ -26,15 +27,16 @@ function CapacityPlanning() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tenantName, setTenantName] = useState('');
-  
+
   // Capacity planning specific states
   const [viewType, setViewType] = useState('heatmap'); // 'heatmap', 'forecast', 'bottleneck'
+  // Initialize dateRange with null or initial dayjs objects
   const [dateRange, setDateRange] = useState([null, null]);
   const [selectedResources, setSelectedResources] = useState([]);
   const [timeUnit, setTimeUnit] = useState('day'); // 'hour', 'day', 'week', 'month'
   const [capacityData, setCapacityData] = useState({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  
+
   // Ref to track if component is mounted
   const isMounted = useRef(true);
 
@@ -44,23 +46,23 @@ function CapacityPlanning() {
       if (isInitialLoad) {
         setLoading(true);
       }
-      
+
       // Special handling for tenant name
       if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
         setTenantName('Product CASE UAT');
       }
-      
+
       // Load data from API
       const tenantData = await fetchTenant(tenantId);
-      
+
       if (tenantData && isMounted.current) {
         setResources(tenantData.resources || []);
         setEvents(tenantData.events || []);
-        
+
         if (!tenantName) {
           setTenantName(tenantData.name || tenantId);
         }
-        
+
         // Set default selection of resources if none selected yet
         if (selectedResources.length === 0 && tenantData.resources?.length > 0) {
           // Default to selecting top 5 most used resources
@@ -80,31 +82,35 @@ function CapacityPlanning() {
     }
   };
 
-  // Initial data load
+  // Initial data load and default date range
   useEffect(() => {
     if (tenantId) {
       loadTenantData(true);
     }
-    
-    // Default date range to current month
-    const today = new Date();
-    const start = new Date(today.getFullYear(), today.getMonth(), 1);
-    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    setDateRange([start, end]);
-    
+
+    // Default date range to current month using dayjs
+    // Only set the default date range if it hasn't been set already
+    if (!dateRange[0] || !dateRange[1]) {
+      const today = dayjs();
+      const startOfMonth = today.startOf('month');
+      const endOfMonth = today.endOf('month');
+      setDateRange([startOfMonth, endOfMonth]);
+    }
+
     // Cleanup function
     return () => {
       isMounted.current = false;
     };
-  }, [tenantId]);
-  
+  }, [tenantId]); // Added dateRange to dependencies to prevent resetting if already set by picker
+
   // Calculate capacity data when dependencies change
   useEffect(() => {
-    if (!loading && resources.length > 0 && events.length > 0) {
+    // Add a check to ensure dateRange has valid dayjs objects before calculating
+    if (!loading && resources.length > 0 && events.length > 0 && dateRange[0] && dateRange[1] && dayjs(dateRange[0]).isValid() && dayjs(dateRange[1]).isValid()) {
       calculateCapacityData();
     }
   }, [resources, events, dateRange, selectedResources, timeUnit, viewType, refreshTrigger]);
-  
+
   // Set up automatic background refresh
   useEffect(() => {
     // Refresh data every 60 seconds
@@ -115,12 +121,12 @@ function CapacityPlanning() {
         setRefreshTrigger(prev => prev + 1);
       }
     }, 60000);
-    
+
     // Clean up interval on component unmount
     return () => {
       clearInterval(refreshInterval);
     };
-  }, [tenantId]);
+  }, [tenantId]); // Added tenantId as it's used in loadTenantData
 
   // Helper function to get top N most used resources
   const getTopResources = (resourceList, eventList, count = 5) => {
@@ -129,12 +135,12 @@ function CapacityPlanning() {
     resourceList.forEach(resource => {
       resourceUsage[resource.id] = 0;
     });
-    
+
     // Count events for each resource
     eventList.forEach(event => {
       if (event.resourceId && resourceUsage[event.resourceId] !== undefined) {
         resourceUsage[event.resourceId]++;
-      } 
+      }
       // Also check for equipment name match
       else if (event.equipment) {
         const matchingResource = resourceList.find(r => r.title === event.equipment);
@@ -143,7 +149,7 @@ function CapacityPlanning() {
         }
       }
     });
-    
+
     // Sort resources by usage and get top N
     return resourceList
       .map(resource => ({
@@ -155,90 +161,76 @@ function CapacityPlanning() {
   };
 
   // Helper to format date for display and binning
+  // Use dayjs for formatting
   const formatDate = (date, unit = timeUnit) => {
     if (!date) return '';
-    
-    const d = new Date(date);
-    
+
+    const d = dayjs(date); // Convert to dayjs object
+
     switch (unit) {
       case 'hour':
-        return d.toLocaleString('en-US', { 
-          year: 'numeric', 
-          month: 'numeric', 
-          day: 'numeric', 
-          hour: 'numeric'
-        });
+        return d.format('MM/DD/YYYY h A'); // Example format: 04/18/2025 5 PM
       case 'day':
-        return d.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'numeric', 
-          day: 'numeric'
-        });
+        return d.format('MM/DD/YYYY'); // Example format: 04/18/2025
       case 'week':
-        // Get the first day of the week (Sunday)
-        const firstDay = new Date(d);
-        firstDay.setDate(d.getDate() - d.getDay());
-        return `Week of ${firstDay.toLocaleDateString('en-US', { 
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        })}`;
+        return `Week of ${d.startOf('week').format('MMM D, YYYY')}`; // Example: Week of Apr 14, 2025
       case 'month':
-        return d.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long'
-        });
+        return d.format('MMMM YYYY'); // Example: April 2025
       default:
-        return d.toLocaleDateString();
+        return d.format('L'); // Default dayjs locale format
     }
   };
 
   // Helper to generate time slots based on time unit and date range
+  // Use dayjs for date manipulation
   const generateTimeSlots = () => {
     if (!dateRange[0] || !dateRange[1]) return [];
-    
-    const start = new Date(dateRange[0]);
-    const end = new Date(dateRange[1]);
+
+    let start = dayjs(dateRange[0]); // Use dayjs object
+    let end = dayjs(dateRange[1]); // Use dayjs object
     const slots = [];
-    
-    let current = new Date(start);
-    
+
+    let current = dayjs(start); // Use dayjs object
+
     switch (timeUnit) {
       case 'hour':
-        while (current <= end) {
-          slots.push(new Date(current));
-          current.setHours(current.getHours() + 1);
+        while (current.isBefore(end) || current.isSame(end, 'hour')) {
+          slots.push(current);
+          current = current.add(1, 'hour');
         }
         break;
       case 'day':
-        while (current <= end) {
-          slots.push(new Date(current));
-          current.setDate(current.getDate() + 1);
+        while (current.isBefore(end) || current.isSame(end, 'day')) {
+          slots.push(current);
+          current = current.add(1, 'day');
         }
         break;
       case 'week':
-        // Start from the first day of the week (Sunday)
-        const firstDay = new Date(start);
-        firstDay.setDate(start.getDate() - start.getDay());
-        current = new Date(firstDay);
-        
-        while (current <= end) {
-          slots.push(new Date(current));
-          current.setDate(current.getDate() + 7);
+        // Start from the first day of the week (Sunday) using dayjs
+        current = start.startOf('week');
+
+        while (current.isBefore(end) || current.isSame(end, 'week')) {
+          slots.push(current);
+          current = current.add(1, 'week');
         }
         break;
       case 'month':
-        // Start from the first day of the month
-        current = new Date(start.getFullYear(), start.getMonth(), 1);
-        
-        while (current <= end) {
-          slots.push(new Date(current));
-          current.setMonth(current.getMonth() + 1);
+        // Start from the first day of the month using dayjs
+        current = start.startOf('month');
+
+        while (current.isBefore(end) || current.isSame(end, 'month')) {
+          slots.push(current);
+          current = current.add(1, 'month');
         }
         break;
+      default:
+        slots.push(start); // Fallback or error handling
     }
-    
-    return slots;
+
+    // Convert dayjs objects back to Date objects if needed later, or process as dayjs objects
+    // For compatibility with existing code that might expect Date objects:
+    return slots; // Keep as dayjs objects for calculations
+    // return slots.map(slot => slot.toDate()); // Convert to Date objects if necessary for other parts
   };
 
   // Main function to calculate capacity data
@@ -247,42 +239,53 @@ function CapacityPlanning() {
       setCapacityData({});
       return;
     }
-    
+
+    // Ensure dateRange elements are dayjs objects before using them
+    const startDate = dayjs(dateRange[0]).startOf('day'); // Use dayjs
+    const endDate = dayjs(dateRange[1]).endOf('day'); // Use dayjs
+
+    if (!startDate.isValid() || !endDate.isValid()) {
+      console.error("Invalid date range provided to calculateCapacityData");
+      setCapacityData({});
+      return;
+    }
+
     // Get selected resources details
     const selectedResourcesDetails = resources.filter(r => selectedResources.includes(r.id));
-    
-    // Generate time slots
+
+    // Generate time slots (these will be dayjs objects)
     const timeSlots = generateTimeSlots();
-    
+
     // Filter events to only include those within date range
-    const startDate = new Date(dateRange[0]);
-    const endDate = new Date(dateRange[1]);
-    endDate.setHours(23, 59, 59, 999); // End of day
-    
     const filteredEvents = events.filter(event => {
       try {
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end || event.start);
-        
-        // Check if event overlaps with date range
-        return eventStart <= endDate && eventEnd >= startDate;
+        const eventStart = dayjs(event.start); // Use dayjs
+        const eventEnd = dayjs(event.end || event.start); // Use dayjs
+
+        if (!eventStart.isValid() || !eventEnd.isValid()) {
+            return false; // Exclude events with invalid dates
+        }
+
+        // Check if event overlaps with date range using dayjs methods
+        return eventStart.isBefore(endDate) && eventEnd.isAfter(startDate);
       } catch (e) {
+        console.error("Error processing event dates:", e);
         return false;
       }
     });
-    
+
     // Calculate utilization data for each resource and time slot
     const utilizationData = {};
-    
+
     selectedResourcesDetails.forEach(resource => {
       utilizationData[resource.id] = {
         resourceName: resource.title,
         timeSlots: {}
       };
-      
+
       // Initialize slots
       timeSlots.forEach(slot => {
-        const slotKey = formatDate(slot);
+        const slotKey = formatDate(slot); // slot is a dayjs object
         utilizationData[resource.id].timeSlots[slotKey] = {
           utilization: 0,
           maintenance: 0,
@@ -291,51 +294,54 @@ function CapacityPlanning() {
           events: []
         };
       });
-      
+
       // Calculate utilization for each event
       filteredEvents.forEach(event => {
         // Check if event is for this resource
         if (event.resourceId !== resource.id && event.equipment !== resource.title) {
           return;
         }
-        
-        const eventStart = new Date(event.start);
-        const eventEnd = new Date(event.end || event.start);
+
+        const eventStart = dayjs(event.start); // Use dayjs
+        const eventEnd = dayjs(event.end || event.start); // Use dayjs
+
+        if (!eventStart.isValid() || !eventEnd.isValid()) {
+            return; // Skip events with invalid dates
+        }
+
         const purpose = event.purpose || 'Utilization';
-        
+
         // Find all time slots this event overlaps with
-        timeSlots.forEach(slotStart => {
+        timeSlots.forEach(slotStart => { // slotStart is a dayjs object
           let slotEnd;
-          
-          // Calculate slot end based on time unit
+
+          // Calculate slot end based on time unit using dayjs
           switch (timeUnit) {
             case 'hour':
-              slotEnd = new Date(slotStart);
-              slotEnd.setHours(slotStart.getHours() + 1);
+              slotEnd = slotStart.add(1, 'hour');
               break;
             case 'day':
-              slotEnd = new Date(slotStart);
-              slotEnd.setDate(slotStart.getDate() + 1);
+              slotEnd = slotStart.add(1, 'day');
               break;
             case 'week':
-              slotEnd = new Date(slotStart);
-              slotEnd.setDate(slotStart.getDate() + 7);
+              slotEnd = slotStart.add(1, 'week');
               break;
             case 'month':
-              slotEnd = new Date(slotStart);
-              slotEnd.setMonth(slotStart.getMonth() + 1);
+              slotEnd = slotStart.add(1, 'month');
               break;
+            default:
+              slotEnd = dayjs(slotStart); // Should not happen with defined units
           }
-          
-          // Check if event overlaps with this slot
-          if (eventStart < slotEnd && eventEnd > slotStart) {
-            const slotKey = formatDate(slotStart);
-            
-            // Calculate overlap duration in hours
-            const overlapStart = eventStart > slotStart ? eventStart : slotStart;
-            const overlapEnd = eventEnd < slotEnd ? eventEnd : slotEnd;
-            const overlapHours = (overlapEnd - overlapStart) / (1000 * 60 * 60);
-            
+
+          // Check if event overlaps with this slot using dayjs methods
+          if (eventStart.isBefore(slotEnd) && eventEnd.isAfter(slotStart)) {
+            const slotKey = formatDate(slotStart); // slotStart is a dayjs object
+
+            // Calculate overlap duration in hours using dayjs diff
+            const overlapStart = eventStart.isAfter(slotStart) ? eventStart : slotStart;
+            const overlapEnd = eventEnd.isBefore(slotEnd) ? eventEnd : slotEnd;
+            const overlapHours = overlapEnd.diff(overlapStart, 'hour', true); // Get difference in hours as a float
+
             // Add to appropriate counter based on purpose
             if (purpose === 'Maintenance') {
               utilizationData[resource.id].timeSlots[slotKey].maintenance += overlapHours;
@@ -344,19 +350,19 @@ function CapacityPlanning() {
             } else {
               utilizationData[resource.id].timeSlots[slotKey].utilization += overlapHours;
             }
-            
+
             utilizationData[resource.id].timeSlots[slotKey].total += overlapHours;
-            
+
             // Add event to the slot
             utilizationData[resource.id].timeSlots[slotKey].events.push({
               ...event,
-              overlapHours
+              overlapHours: overlapHours.toFixed(1) // Format overlap hours for display
             });
           }
         });
       });
     });
-    
+
     // Calculate capacity limits based on time unit
     const hoursPerSlot = {
       hour: 1,
@@ -364,27 +370,29 @@ function CapacityPlanning() {
       week: 24 * 7,
       month: 24 * 30 // Approximation
     };
-    
+
     // Process utilization data into heatmap, forecast, and bottleneck formats
     const heatmapData = [];
     const forecastData = [];
     const bottleneckData = [];
-    
+
     selectedResourcesDetails.forEach(resource => {
       const resourceData = utilizationData[resource.id];
-      
+
       // Process for heatmap
       Object.entries(resourceData.timeSlots).forEach(([slotKey, data]) => {
         const maxCapacity = hoursPerSlot[timeUnit];
-        const utilizationPercent = Math.min(100, Math.round((data.utilization / maxCapacity) * 100));
-        const maintenancePercent = Math.min(100, Math.round((data.maintenance / maxCapacity) * 100));
-        const brokenPercent = Math.min(100, Math.round((data.broken / maxCapacity) * 100));
-        const totalPercent = Math.min(100, Math.round((data.total / maxCapacity) * 100));
-        
+        // Ensure no division by zero if maxCapacity is 0 (though unlikely with these units)
+        const utilizationPercent = maxCapacity > 0 ? Math.min(100, Math.round((data.utilization / maxCapacity) * 100)) : 0;
+        const maintenancePercent = maxCapacity > 0 ? Math.min(100, Math.round((data.maintenance / maxCapacity) * 100)) : 0;
+        const brokenPercent = maxCapacity > 0 ? Math.min(100, Math.round((data.broken / maxCapacity) * 100)) : 0;
+        const totalPercent = maxCapacity > 0 ? Math.min(100, Math.round((data.total / maxCapacity) * 100)) : 0;
+
+
         heatmapData.push({
           resource: resource.title,
           resourceId: resource.id,
-          timeSlot: slotKey,
+          timeSlot: slotKey, // This is the formatted string
           utilizationHours: data.utilization.toFixed(1),
           maintenanceHours: data.maintenance.toFixed(1),
           brokenHours: data.broken.toFixed(1),
@@ -397,22 +405,23 @@ function CapacityPlanning() {
           maxCapacity
         });
       });
-      
+
       // Process for forecast
       // For simplicity, we'll use past data to project future trends
       // In a real implementation, you'd use more sophisticated forecasting
+       const totalUtilizationForForecast = Object.values(resourceData.timeSlots).reduce((sum, data) => sum + data.utilization, 0);
+       const totalTotalForForecast = Object.values(resourceData.timeSlots).reduce((sum, data) => sum + data.total, 0);
+       const availableHoursForForecast = timeSlots.length * hoursPerSlot[timeUnit];
+
       forecastData.push({
         resource: resource.title,
         resourceId: resource.id,
-        current: Object.values(resourceData.timeSlots).reduce((sum, data) => sum + data.total, 0),
-        projected: Object.values(resourceData.timeSlots).reduce((sum, data) => sum + data.total, 0) * 1.15, // Example 15% growth
-        availableHours: timeSlots.length * hoursPerSlot[timeUnit],
-        utilizationRate: Math.round(
-          (Object.values(resourceData.timeSlots).reduce((sum, data) => sum + data.utilization, 0) / 
-          (timeSlots.length * hoursPerSlot[timeUnit])) * 100
-        )
+        current: totalTotalForForecast,
+        projected: totalTotalForForecast * 1.15, // Example 15% growth
+        availableHours: availableHoursForForecast,
+        utilizationRate: availableHoursForForecast > 0 ? Math.round((totalUtilizationForForecast / availableHoursForForecast) * 100) : 0
       });
-      
+
       // Process for bottleneck analysis
       const totalUtilizationHours = Object.values(resourceData.timeSlots).reduce(
         (sum, data) => sum + data.utilization, 0
@@ -427,7 +436,25 @@ function CapacityPlanning() {
         (sum, data) => sum + data.total, 0
       );
       const maxCapacityHours = timeSlots.length * hoursPerSlot[timeUnit];
-      
+
+      const peakUtilization = Math.max(
+          0, // Ensure minimum peak is 0
+          ...Object.values(resourceData.timeSlots).map(data =>
+            maxCapacityHours > 0 ? Math.round((data.total / maxCapacityHours) * 100) : 0
+          )
+        );
+
+      const highUtilizationSlotsCount = Object.values(resourceData.timeSlots).filter(
+         data => maxCapacityHours > 0 && data.total > 0.8 * hoursPerSlot[timeUnit]
+      ).length;
+
+      const bottleneckScore = (maxCapacityHours > 0 && timeSlots.length > 0) ?
+        Math.round(
+          (totalUtilizationHours / maxCapacityHours) * 70 + // 70% weight on utilization
+          (highUtilizationSlotsCount / timeSlots.length) * 30 // 30% weight on frequency of high utilization
+        ) : 0; // Handle cases with no capacity or time slots
+
+
       bottleneckData.push({
         resource: resource.title,
         resourceId: resource.id,
@@ -435,30 +462,23 @@ function CapacityPlanning() {
         maintenanceHours: totalMaintenanceHours.toFixed(1),
         brokenHours: totalBrokenHours.toFixed(1),
         totalHours: totalHours.toFixed(1),
-        capacityHours: maxCapacityHours,
-        utilizationPercent: Math.round((totalUtilizationHours / maxCapacityHours) * 100),
-        downtimePercent: Math.round(((totalMaintenanceHours + totalBrokenHours) / maxCapacityHours) * 100),
-        peakUtilization: Math.max(
-          ...Object.values(resourceData.timeSlots).map(data => Math.round((data.total / hoursPerSlot[timeUnit]) * 100))
-        ),
+        capacityHours: maxCapacityHours.toFixed(1),
+        utilizationPercent: maxCapacityHours > 0 ? Math.round((totalUtilizationHours / maxCapacityHours) * 100) : 0,
+        downtimePercent: maxCapacityHours > 0 ? Math.round(((totalMaintenanceHours + totalBrokenHours) / maxCapacityHours) * 100) : 0,
+        peakUtilization: peakUtilization,
         // Calculate bottleneck score (0-100) - higher means more likely to be a bottleneck
-        bottleneckScore: Math.round(
-          (totalUtilizationHours / maxCapacityHours) * 70 + // 70% weight on utilization
-          (Object.values(resourceData.timeSlots).filter(
-            data => data.total > 0.8 * hoursPerSlot[timeUnit]
-          ).length / timeSlots.length) * 30 // 30% weight on frequency of high utilization
-        )
+        bottleneckScore: bottleneckScore
       });
     });
-    
+
     // Sort bottlenecks by bottleneck score descending
     bottleneckData.sort((a, b) => b.bottleneckScore - a.bottleneckScore);
-    
+
     setCapacityData({
       heatmap: heatmapData,
       forecast: forecastData,
       bottleneck: bottleneckData,
-      timeSlots
+      timeSlots // Keep as dayjs objects here
     });
   };
 
@@ -495,8 +515,9 @@ function CapacityPlanning() {
     setSelectedResources(value);
   };
 
-  // Handle date range change
+  // Handle date range change - dates will be dayjs objects from Ant Design
   const handleDateRangeChange = (dates) => {
+    // dates is typically [dayjs, dayjs] or [null, null]
     setDateRange(dates);
   };
 
@@ -526,7 +547,7 @@ function CapacityPlanning() {
         />
       );
     }
-    
+
     // Group heatmap data by resource
     const groupedData = {};
     capacityData.heatmap.forEach(item => {
@@ -537,54 +558,72 @@ function CapacityPlanning() {
           slots: []
         };
       }
-      
+
       groupedData[item.resourceId].slots.push(item);
     });
-    
+
     // Sort time slots chronologically for each resource
     Object.values(groupedData).forEach(resource => {
       resource.slots.sort((a, b) => {
-        // Convert formatted date strings back to comparable dates
-        const dateA = new Date(a.timeSlot);
-        const dateB = new Date(b.timeSlot);
-        return dateA - dateB;
+        // Compare based on the original dayjs objects if available,
+        // or try parsing the formatted string (less reliable)
+        // Assuming timeSlots in capacityData are the original dayjs objects now:
+        const dateA = capacityData.timeSlots.find(slot => formatDate(slot) === a.timeSlot);
+        const dateB = capacityData.timeSlots.find(slot => formatDate(slot) === b.timeSlot);
+        if (dateA && dateB) {
+            return dateA.valueOf() - dateB.valueOf(); // Compare using dayjs valueOf
+        }
+         // Fallback to parsing formatted string if dayjs objects are not in capacityData
+         try {
+            const parsedDateA = dayjs(a.timeSlot, { strict: false }); // Non-strict parsing
+            const parsedDateB = dayjs(b.timeSlot, { strict: false }); // Non-strict parsing
+             if (parsedDateA.isValid() && parsedDateB.isValid()) {
+                 return parsedDateA.valueOf() - parsedDateB.valueOf();
+             }
+         } catch (e) {
+             console.error("Error parsing heatmap time slots for sorting:", e);
+         }
+        return 0; // Cannot sort
       });
     });
-    
+
+
     // Get unique time slots for headers
-    const allTimeSlots = [...new Set(capacityData.heatmap.map(item => item.timeSlot))];
-    
-    // Sort time slots chronologically
-    allTimeSlots.sort((a, b) => {
-      const dateA = new Date(a);
-      const dateB = new Date(b);
-      return dateA - dateB;
-    });
-    
+    // Use the original dayjs objects from capacityData.timeSlots for reliable sorting
+    const allTimeSlotsDayjs = capacityData.timeSlots || [];
+
+    // Sort dayjs time slots chronologically
+     allTimeSlotsDayjs.sort((a, b) => a.valueOf() - b.valueOf());
+
+
     return (
       <div className="heatmap-container">
         <div className="heatmap-header">
           <div className="heatmap-resource-header">Resource</div>
-          {allTimeSlots.map((slot, index) => (
+          {allTimeSlotsDayjs.map((slotDayjs, index) => {
+              const slot = formatDate(slotDayjs); // Format for display
+              return (
             <div key={index} className="heatmap-time-header">
-              {timeUnit === 'hour' ? slot.split(' ')[3] + (slot.includes('PM') ? 'PM' : 'AM') : 
-               timeUnit === 'day' ? slot.split(',')[0] : 
-               timeUnit === 'week' ? `W${index + 1}` : 
+              {timeUnit === 'hour' ? slot.split(' ')[3] + (slot.includes('PM') ? 'PM' : 'AM') :
+               timeUnit === 'day' ? slot.split(',')[0] :
+               timeUnit === 'week' ? `W${index + 1}` :
                slot}
             </div>
-          ))}
+          )})}
         </div>
-        
+
         <div className="heatmap-body">
           {Object.values(groupedData).map((resource, resourceIndex) => (
             <div key={resourceIndex} className="heatmap-row">
               <div className="heatmap-resource-cell">
                 {resource.resource}
               </div>
-              
-              {allTimeSlots.map((timeSlot, slotIndex) => {
-                const slotData = resource.slots.find(s => s.timeSlot === timeSlot);
-                
+
+              {allTimeSlotsDayjs.map((timeSlotDayjs, slotIndex) => {
+                 const timeSlotFormatted = formatDate(timeSlotDayjs);
+                 const slotData = resource.slots.find(s => s.timeSlot === timeSlotFormatted);
+
+
                 // If no data for this slot, show empty cell
                 if (!slotData) {
                   return (
@@ -593,26 +632,27 @@ function CapacityPlanning() {
                     </div>
                   );
                 }
-                
+
                 const totalPercent = slotData.totalPercent;
                 const color = getHeatmapColor(totalPercent);
-                
+
                 return (
-                  <Tooltip 
-                    key={slotIndex} 
+                  <Tooltip
+                    key={slotIndex}
                     title={
                       <>
-                        <p><strong>{resource.resource} - {timeSlot}</strong></p>
+                        <p><strong>{resource.resource} - {timeSlotFormatted}</strong></p>
                         <p>Utilization: {slotData.utilizationHours}h ({slotData.utilizationPercent}%)</p>
                         <p>Maintenance: {slotData.maintenanceHours}h ({slotData.maintenancePercent}%)</p>
                         <p>Downtime: {slotData.brokenHours}h ({slotData.brokenPercent}%)</p>
                         <p>Total: {slotData.totalHours}h ({slotData.totalPercent}%)</p>
                         <p>Events: {slotData.events.length}</p>
+                        <p>Max Capacity (per slot): {slotData.maxCapacity}h</p>
                       </>
                     }
                   >
-                    <div 
-                      className="heatmap-cell" 
+                    <div
+                      className="heatmap-cell"
                       style={{ backgroundColor: color }}
                     >
                       <div className="cell-content">{totalPercent}%</div>
@@ -623,7 +663,7 @@ function CapacityPlanning() {
             </div>
           ))}
         </div>
-        
+
         <div className="heatmap-legend">
           <div className="legend-item">
             <div className="legend-color" style={{ backgroundColor: '#d9d9d9' }}></div>
@@ -661,12 +701,13 @@ function CapacityPlanning() {
         />
       );
     }
-    
+
     const columns = [
       {
         title: 'Resource',
         dataIndex: 'resource',
         key: 'resource',
+        sorter: (a, b) => a.resource.localeCompare(b.resource),
       },
       {
         title: 'Current Utilization',
@@ -675,9 +716,9 @@ function CapacityPlanning() {
         render: (text, record) => (
           <Space direction="vertical" size={0}>
             <span>{record.current.toFixed(1)} hours</span>
-            <Progress 
-              percent={record.utilizationRate} 
-              size="small" 
+            <Progress
+              percent={record.utilizationRate}
+              size="small"
               status={record.utilizationRate > 85 ? 'exception' : 'normal'}
             />
           </Space>
@@ -688,16 +729,20 @@ function CapacityPlanning() {
         title: 'Projected Utilization',
         dataIndex: 'projected',
         key: 'projected',
-        render: (text, record) => (
-          <Space direction="vertical" size={0}>
-            <span>{record.projected.toFixed(1)} hours</span>
-            <Progress 
-              percent={Math.min(100, Math.round((record.projected / record.availableHours) * 100))} 
-              size="small" 
-              status={record.projected > record.availableHours * 0.85 ? 'exception' : 'normal'}
-            />
-          </Space>
-        ),
+        render: (text, record) => {
+             const projectedRate = record.availableHours > 0 ? Math.min(100, Math.round((record.projected / record.availableHours) * 100)) : 0;
+             const status = record.projected > record.availableHours * 0.85 ? 'exception' : 'normal';
+             return (
+                <Space direction="vertical" size={0}>
+                  <span>{record.projected.toFixed(1)} hours</span>
+                  <Progress
+                    percent={projectedRate}
+                    size="small"
+                    status={status}
+                  />
+                </Space>
+            );
+        },
         sorter: (a, b) => a.projected - b.projected,
       },
       {
@@ -705,6 +750,7 @@ function CapacityPlanning() {
         dataIndex: 'availableHours',
         key: 'availableHours',
         render: hours => `${hours.toFixed(1)} hours`,
+        sorter: (a, b) => a.availableHours - b.availableHours,
       },
       {
         title: 'Utilization Rate',
@@ -715,7 +761,7 @@ function CapacityPlanning() {
           if (rate > 85) color = 'red';
           else if (rate > 70) color = 'orange';
           else if (rate > 50) color = 'blue';
-          
+
           return (
             <Tag color={color}>{rate}%</Tag>
           );
@@ -726,8 +772,8 @@ function CapacityPlanning() {
         title: 'Status',
         key: 'status',
         render: (_, record) => {
-          const projectedRate = Math.round((record.projected / record.availableHours) * 100);
-          
+          const projectedRate = record.availableHours > 0 ? Math.round((record.projected / record.availableHours) * 100) : 0;
+
           if (projectedRate > 95) {
             return <Tag color="red">Capacity Exceeded</Tag>;
           } else if (projectedRate > 85) {
@@ -740,29 +786,30 @@ function CapacityPlanning() {
         },
       },
     ];
-    
+
     return (
       <div className="forecast-container">
         <Row gutter={[16, 16]}>
           <Col span={24}>
-            <Table 
-              dataSource={capacityData.forecast} 
+            <Table
+              dataSource={capacityData.forecast}
               columns={columns}
               rowKey="resourceId"
               pagination={false}
+              scroll={{ x: 'max-content' }} // Add horizontal scroll for smaller screens
             />
           </Col>
-          
+
           <Col span={24}>
             <Card title="Capacity Forecast Insights">
               <Row gutter={16}>
                 <Col xs={24} sm={12} md={8}>
                   <Statistic
                     title="Average Utilization"
-                    value={Math.round(
-                      capacityData.forecast.reduce((sum, item) => sum + item.utilizationRate, 0) / 
+                    value={capacityData.forecast.length > 0 ? Math.round(
+                      capacityData.forecast.reduce((sum, item) => sum + item.utilizationRate, 0) /
                       capacityData.forecast.length
-                    )}
+                    ) : 0}
                     suffix="%"
                     valueStyle={{ color: '#1890ff' }}
                   />
@@ -770,8 +817,8 @@ function CapacityPlanning() {
                 <Col xs={24} sm={12} md={8}>
                   <Statistic
                     title="Resources at Risk"
-                    value={capacityData.forecast.filter(item => 
-                      Math.round((item.projected / item.availableHours) * 100) > 85
+                    value={capacityData.forecast.filter(item =>
+                      item.availableHours > 0 && Math.round((item.projected / item.availableHours) * 100) > 85
                     ).length}
                     suffix={`/ ${capacityData.forecast.length}`}
                     valueStyle={{ color: '#fa8c16' }}
@@ -807,12 +854,13 @@ function CapacityPlanning() {
         />
       );
     }
-    
+
     const columns = [
       {
         title: 'Resource',
         dataIndex: 'resource',
         key: 'resource',
+        sorter: (a, b) => a.resource.localeCompare(b.resource),
       },
       {
         title: 'Utilization',
@@ -820,9 +868,9 @@ function CapacityPlanning() {
         key: 'utilizationPercent',
         render: percent => (
           <Space direction="vertical" size={0}>
-            <Progress 
-              percent={percent} 
-              size="small" 
+            <Progress
+              percent={percent}
+              size="small"
               status={percent > 85 ? 'exception' : 'normal'}
             />
             <span>{percent}%</span>
@@ -836,9 +884,9 @@ function CapacityPlanning() {
         key: 'peakUtilization',
         render: percent => (
           <Tag color={
-            percent > 95 ? 'red' : 
-            percent > 85 ? 'orange' : 
-            percent > 70 ? 'blue' : 
+            percent > 95 ? 'red' :
+            percent > 85 ? 'orange' :
+            percent > 70 ? 'blue' :
             'green'
           }>
             {percent}%
@@ -852,9 +900,9 @@ function CapacityPlanning() {
         key: 'downtimePercent',
         render: percent => (
           <Tag color={
-            percent > 20 ? 'red' : 
-            percent > 10 ? 'orange' : 
-            percent > 5 ? 'blue' : 
+            percent > 20 ? 'red' :
+            percent > 10 ? 'orange' :
+            percent > 5 ? 'blue' :
             'green'
           }>
             {percent}%
@@ -870,9 +918,9 @@ function CapacityPlanning() {
           const { color, text } = getBottleneckStatus(score);
           return (
             <Space direction="vertical" size={0}>
-              <Progress 
-                percent={score} 
-                size="small" 
+              <Progress
+                percent={score}
+                size="small"
                 strokeColor={color}
               />
               <span>{score} - {text}</span>
@@ -887,7 +935,7 @@ function CapacityPlanning() {
         key: 'action',
         render: (_, record) => {
           const { status } = getBottleneckStatus(record.bottleneckScore);
-          
+
           if (status === 'critical') {
             return (
               <Tag color="red" icon={<WarningOutlined />}>
@@ -916,19 +964,20 @@ function CapacityPlanning() {
         },
       },
     ];
-    
+
     return (
       <div className="bottleneck-container">
         <Row gutter={[16, 16]}>
           <Col span={24}>
-            <Table 
-              dataSource={capacityData.bottleneck} 
+            <Table
+              dataSource={capacityData.bottleneck}
               columns={columns}
               rowKey="resourceId"
               pagination={false}
+              scroll={{ x: 'max-content' }} // Add horizontal scroll for smaller screens
             />
           </Col>
-          
+
           <Col span={24}>
             <Card title="Bottleneck Resolution Recommendations">
               {capacityData.bottleneck.some(item => item.bottleneckScore >= 70) ? (
@@ -940,7 +989,7 @@ function CapacityPlanning() {
                       .map((item, index) => (
                         <li key={index}>
                           <strong>{item.resource}:</strong> {
-                            item.bottleneckScore >= 85 ? 
+                            item.bottleneckScore >= 85 ?
                               `Consider adding additional ${item.resource} capacity immediately. Current utilization is at ${item.utilizationPercent}% with peak utilization at ${item.peakUtilization}%.` :
                               `Plan for additional ${item.resource} capacity within the next planning cycle. Current utilization is at ${item.utilizationPercent}% with peak utilization at ${item.peakUtilization}%.`
                           }
@@ -957,7 +1006,7 @@ function CapacityPlanning() {
                   showIcon
                 />
               )}
-              
+
               {capacityData.bottleneck.some(item => item.downtimePercent > 10) && (
                 <div className="recommendations" style={{ marginTop: '16px' }}>
                   <h4>Downtime Recommendations:</h4>
@@ -988,7 +1037,7 @@ function CapacityPlanning() {
         <div className="header-content">
           <Title level={3}>{getDisplayName()} - Capacity Planning</Title>
           <div className="header-actions">
-            <Button 
+            <Button
               type="primary"
               icon={<CalendarOutlined />}
               onClick={() => navigate(`/${tenantId}`)}
@@ -998,7 +1047,7 @@ function CapacityPlanning() {
           </div>
         </div>
       </Card>
-      
+
       {loading ? (
         <Card>
           <div className="loading-container">
@@ -1026,13 +1075,13 @@ function CapacityPlanning() {
               <Row gutter={16} align="middle">
                 <Col xs={24} sm={12} md={6}>
                   <Text strong>Date Range:</Text>
-                  <RangePicker 
+                  <RangePicker
                     style={{ width: '100%', marginTop: '8px' }}
-                    value={dateRange}
-                    onChange={handleDateRangeChange}
+                    value={dateRange} // dateRange now contains dayjs objects or null
+                    onChange={handleDateRangeChange} // This will receive dayjs objects
                   />
                 </Col>
-                
+
                 <Col xs={24} sm={12} md={6}>
                   <Text strong>Time Granularity:</Text>
                   <Select
@@ -1046,7 +1095,7 @@ function CapacityPlanning() {
                     <Option value="month">Monthly</Option>
                   </Select>
                 </Col>
-                
+
                 <Col xs={24} md={10}>
                   <Text strong>Equipment:</Text>
                   <Select
@@ -1064,10 +1113,10 @@ function CapacityPlanning() {
                     ))}
                   </Select>
                 </Col>
-                
+
                 <Col xs={24} md={2}>
-                  <Button 
-                    icon={<ReloadOutlined />} 
+                  <Button
+                    icon={<ReloadOutlined />}
                     onClick={handleRefresh}
                     style={{ marginTop: '28px' }}
                   >
@@ -1077,25 +1126,25 @@ function CapacityPlanning() {
               </Row>
             </Space>
           </Card>
-          
+
           <Card style={{ marginTop: '16px' }}>
             <Tabs activeKey={viewType} onChange={handleViewTypeChange}>
-              <TabPane 
-                tab={<span><BarChartOutlined /> Capacity Heatmap</span>} 
+              <TabPane
+                tab={<span><BarChartOutlined /> Capacity Heatmap</span>}
                 key="heatmap"
               >
                 {renderHeatmap()}
               </TabPane>
-              
-              <TabPane 
-                tab={<span><LineChartOutlined /> Capacity Forecast</span>} 
+
+              <TabPane
+                tab={<span><LineChartOutlined /> Capacity Forecast</span>}
                 key="forecast"
               >
                 {renderForecast()}
               </TabPane>
-              
-              <TabPane 
-                tab={<span><FireOutlined /> Bottleneck Analysis</span>} 
+
+              <TabPane
+                tab={<span><FireOutlined /> Bottleneck Analysis</span>}
                 key="bottleneck"
               >
                 {renderBottleneckAnalysis()}
