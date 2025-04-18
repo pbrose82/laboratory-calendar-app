@@ -1,381 +1,54 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { fetchTenant } from '../services/apiClient';
-import './ResourceViews.css';
+import { 
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, 
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
 
-function Analytics() {
-  const { tenantId } = useParams();
-  const navigate = useNavigate();
+function AnalyticsDashboard() {
   const [resources, setResources] = useState([]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [tenantName, setTenantName] = useState('');
-  
-  // Time range for analytics (default: last 30 days)
+  const [tenantName, setTenantName] = useState('Demo Tenant');
   const [timeRange, setTimeRange] = useState('30days');
-  
-  // Ref to track if component is mounted
   const isMounted = useRef(true);
 
-  // Function to load tenant data - handles both initial load and background refresh
-  const loadTenantData = async (isInitialLoad = false) => {
-    try {
-      if (isInitialLoad) {
-        setLoading(true);
-      }
-      
-      // Special handling for tenant name
-      if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
-        setTenantName('Product CASE UAT');
-      }
-      
-      // Normal tenant handling from API
-      const tenantData = await fetchTenant(tenantId);
-      
-      if (tenantData && isMounted.current) {
-        console.log('Analytics - setting resources and events');
-        setResources(tenantData.resources || []);
-        setEvents(tenantData.events || []);
-        
-        if (!tenantName) {
-          setTenantName(tenantData.name || tenantId);
-        }
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Analytics data refreshed at', new Date().toLocaleTimeString());
-        }
-      }
-    } catch (err) {
-      if (isMounted.current) {
-        console.error('Failed to load tenant data:', err);
-        setError(`Error loading tenant data: ${err.message}`);
-      }
-    } finally {
-      if (isInitialLoad && isMounted.current) {
-        setLoading(false);
-      }
-    }
-  };
-
-  // Initial data load
+  // Simulating the data load function for the demo
   useEffect(() => {
-    if (tenantId) {
-      loadTenantData(true);
-    }
+    // Simulate API call
+    setTimeout(() => {
+      setLoading(false);
+    }, 1000);
     
-    // Cleanup function
     return () => {
       isMounted.current = false;
     };
-  }, [tenantId]);
-  
-  // Set up automatic background refresh - using 30 seconds interval for consistency
-  useEffect(() => {
-    // Refresh data every 30 seconds
-    const refreshInterval = setInterval(() => {
-      if (isMounted.current) {
-        console.log('Analytics - triggering background refresh');
-        loadTenantData(false);
-      }
-    }, 30000);
-    
-    // Clean up interval on component unmount
-    return () => {
-      clearInterval(refreshInterval);
-    };
-  }, [tenantId]);
+  }, []);
 
-  // Get events within the selected time range
-  const getFilteredEvents = () => {
-    if (!events || events.length === 0) {
-      return [];
-    }
-    
-    const now = new Date();
-    let rangeStart;
-    
-    switch (timeRange) {
-      case '7days':
-        rangeStart = new Date(now);
-        rangeStart.setDate(now.getDate() - 7);
-        break;
-      case '30days':
-        rangeStart = new Date(now);
-        rangeStart.setDate(now.getDate() - 30);
-        break;
-      case '90days':
-        rangeStart = new Date(now);
-        rangeStart.setDate(now.getDate() - 90);
-        break;
-      case '12months':
-        rangeStart = new Date(now);
-        rangeStart.setMonth(now.getMonth() - 12);
-        break;
-      default:
-        rangeStart = new Date(now);
-        rangeStart.setDate(now.getDate() - 30);
-    }
-    
-    return events.filter(event => {
-      try {
-        const eventDate = new Date(event.start);
-        return eventDate >= rangeStart && eventDate <= now;
-      } catch (e) {
-        console.error('Error parsing event date:', e, event);
-        return false;
-      }
-    });
-  };
+  // Demo data for visualization
+  const purposeData = [
+    { name: 'Utilization', value: 68, color: '#4285F4' },
+    { name: 'Maintenance', value: 22, color: '#FBBC05' },
+    { name: 'Broken', value: 10, color: '#EA4335' }
+  ];
 
-  // Calculate equipment utilization
-  const calculateEquipmentUtilization = () => {
-    if (!resources || resources.length === 0) {
-      return [];
-    }
-    
-    const filteredEvents = getFilteredEvents();
-    
-    if (filteredEvents.length === 0) {
-      return resources.map(resource => ({
-        name: resource.title,
-        id: resource.id,
-        count: 0,
-        utilization: 0,
-        totalCost: 0,
-        avgCost: 0,
-        utilizationCount: 0,
-        maintenanceCount: 0,
-        brokenCount: 0
-      }));
-    }
-    
-    const utilization = resources.map(resource => {
-      const resourceEvents = filteredEvents.filter(event => 
-        event.resourceId === resource.id || 
-        event.equipment === resource.title
-      );
-      
-      // Calculate purpose counts
-      const utilizationEvents = resourceEvents.filter(e => (e.purpose || 'Utilization') === 'Utilization');
-      const maintenanceEvents = resourceEvents.filter(e => e.purpose === 'Maintenance');
-      const brokenEvents = resourceEvents.filter(e => e.purpose === 'Broken');
-      
-      // Calculate cost metrics
-      const totalCost = resourceEvents.reduce((sum, event) => sum + (Number(event.cost) || 0), 0);
-      const avgCost = resourceEvents.length > 0 ? totalCost / resourceEvents.length : 0;
-      
-      return {
-        name: resource.title || 'Unknown Equipment',
-        id: resource.id,
-        count: resourceEvents.length,
-        utilization: filteredEvents.length > 0 ? 
-          Math.round((resourceEvents.length / filteredEvents.length) * 100) : 0,
-        totalCost: totalCost,
-        avgCost: avgCost,
-        utilizationCount: utilizationEvents.length,
-        maintenanceCount: maintenanceEvents.length,
-        brokenCount: brokenEvents.length
-      };
-    }).sort((a, b) => b.count - a.count);
-    
-    return utilization;
-  };
+  const monthlyData = [
+    { name: 'Nov', count: 45, cost: 12500 },
+    { name: 'Dec', count: 38, cost: 10800 },
+    { name: 'Jan', count: 52, cost: 14500 },
+    { name: 'Feb', count: 61, cost: 17200 },
+    { name: 'Mar', count: 57, cost: 16100 },
+    { name: 'Apr', count: 64, cost: 18400 }
+  ];
 
-  // Calculate purpose breakdown for all events
-  const calculatePurposeBreakdown = () => {
-    const filteredEvents = getFilteredEvents();
-    
-    if (filteredEvents.length === 0) {
-      return {
-        utilization: 0,
-        maintenance: 0,
-        broken: 0,
-        total: 0
-      };
-    }
-    
-    const counts = {
-      utilization: filteredEvents.filter(e => (e.purpose || 'Utilization') === 'Utilization').length,
-      maintenance: filteredEvents.filter(e => e.purpose === 'Maintenance').length,
-      broken: filteredEvents.filter(e => e.purpose === 'Broken').length,
-      total: filteredEvents.length
-    };
-    
-    return {
-      ...counts,
-      utilizationPercent: Math.round((counts.utilization / counts.total) * 100),
-      maintenancePercent: Math.round((counts.maintenance / counts.total) * 100),
-      brokenPercent: Math.round((counts.broken / counts.total) * 100)
-    };
-  };
+  const equipmentData = [
+    { name: 'HPLC Agilent 1260', utilization: 81, maintenance: 15, broken: 4, totalCost: 24500 },
+    { name: 'Mass Spec AB Sciex', utilization: 75, maintenance: 18, broken: 7, totalCost: 31200 },
+    { name: 'NMR Bruker 400MHz', utilization: 62, maintenance: 28, broken: 10, totalCost: 19800 },
+    { name: 'PCR Thermal Cycler', utilization: 78, maintenance: 17, broken: 5, totalCost: 12600 },
+    { name: 'Microplate Reader', utilization: 83, maintenance: 12, broken: 5, totalCost: 9700 }
+  ];
 
-  // Calculate total and average costs
-  const calculateCostMetrics = () => {
-    const filteredEvents = getFilteredEvents();
-    
-    if (filteredEvents.length === 0) {
-      return {
-        totalCost: 0,
-        avgCost: 0,
-        utilizationCost: 0,
-        maintenanceCost: 0,
-        brokenCost: 0
-      };
-    }
-    
-    // Calculate total costs
-    const totalCost = filteredEvents.reduce((sum, event) => sum + (Number(event.cost) || 0), 0);
-    
-    // Calculate costs by purpose
-    const utilizationCost = filteredEvents
-      .filter(e => (e.purpose || 'Utilization') === 'Utilization')
-      .reduce((sum, event) => sum + (Number(event.cost) || 0), 0);
-      
-    const maintenanceCost = filteredEvents
-      .filter(e => e.purpose === 'Maintenance')
-      .reduce((sum, event) => sum + (Number(event.cost) || 0), 0);
-      
-    const brokenCost = filteredEvents
-      .filter(e => e.purpose === 'Broken')
-      .reduce((sum, event) => sum + (Number(event.cost) || 0), 0);
-    
-    return {
-      totalCost,
-      avgCost: filteredEvents.length > 0 ? Math.round(totalCost / filteredEvents.length) : 0,
-      utilizationCost,
-      maintenanceCost,
-      brokenCost
-    };
-  };
-
-  // Get top technicians by number of events
-  const getTopTechnicians = () => {
-    const filteredEvents = getFilteredEvents();
-    
-    if (filteredEvents.length === 0) {
-      return [];
-    }
-    
-    const technicianCounts = {};
-    const technicianCosts = {};
-    
-    filteredEvents.forEach(event => {
-      if (event.technician) {
-        // Count events
-        if (technicianCounts[event.technician]) {
-          technicianCounts[event.technician]++;
-          technicianCosts[event.technician] += (Number(event.cost) || 0);
-        } else {
-          technicianCounts[event.technician] = 1;
-          technicianCosts[event.technician] = (Number(event.cost) || 0);
-        }
-      }
-    });
-    
-    return Object.entries(technicianCounts)
-      .map(([name, count]) => ({ 
-        name, 
-        count,
-        totalCost: technicianCosts[name],
-        avgCost: Math.round(technicianCosts[name] / count)
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-  };
-
-  // Get monthly event counts
-  const getMonthlyEventCounts = () => {
-    const now = new Date();
-    const months = [];
-    
-    // Generate last 6 months
-    for (let i = 5; i >= 0; i--) {
-      const monthDate = new Date(now);
-      monthDate.setMonth(now.getMonth() - i);
-      months.push({
-        name: monthDate.toLocaleString('default', { month: 'short' }),
-        year: monthDate.getFullYear(),
-        month: monthDate.getMonth(),
-        count: 0,
-        cost: 0
-      });
-    }
-    
-    // Count events per month
-    if (events && events.length > 0) {
-      events.forEach(event => {
-        try {
-          const eventDate = new Date(event.start);
-          const monthIndex = months.findIndex(m => 
-            m.month === eventDate.getMonth() && m.year === eventDate.getFullYear()
-          );
-          
-          if (monthIndex >= 0) {
-            months[monthIndex].count++;
-            months[monthIndex].cost += (Number(event.cost) || 0);
-          }
-        } catch (e) {
-          console.error('Error processing event date:', e, event);
-        }
-      });
-    }
-    
-    return months;
-  };
-
-  // Calculate overall metrics
-  const calculateMetrics = () => {
-    const filteredEvents = getFilteredEvents();
-    const totalEvents = filteredEvents.length;
-    
-    // Calculate average events per day
-    const days = getTimeRangeDays();
-    const eventsPerDay = days > 0 ? Math.round((totalEvents / days) * 10) / 10 : 0;
-    
-    // Calculate utilization rate (events / (resources * days))
-    const utilizationRate = resources.length > 0 && days > 0 
-      ? Math.round((totalEvents / (resources.length * days)) * 100) 
-      : 0;
-    
-    // Calculate downtime ratio (maintenance + broken / total events)
-    const maintenanceEvents = filteredEvents.filter(e => e.purpose === 'Maintenance').length;
-    const brokenEvents = filteredEvents.filter(e => e.purpose === 'Broken').length;
-    const downtimeRatio = totalEvents > 0 
-      ? Math.round(((maintenanceEvents + brokenEvents) / totalEvents) * 100) 
-      : 0;
-    
-    return {
-      totalEvents,
-      eventsPerDay,
-      utilizationRate,
-      downtimeRatio
-    };
-  };
-
-  // Get number of days in the selected time range
-  const getTimeRangeDays = () => {
-    switch (timeRange) {
-      case '7days': return 7;
-      case '30days': return 30;
-      case '90days': return 90;
-      case '12months': return 365;
-      default: return 30;
-    }
-  };
-
-  // Format display name for tenant
-  const getDisplayName = () => {
-    if (tenantId === 'demo-tenant') {
-      return 'Demo Tenant';
-    } else if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
-      return 'Product CASE UAT';
-    } else {
-      return tenantName || tenantId;
-    }
-  };
-
-  // Format currency for display
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -385,313 +58,280 @@ function Analytics() {
     }).format(amount);
   };
 
-  const metrics = calculateMetrics();
-  const equipmentUtilization = calculateEquipmentUtilization();
-  const topTechnicians = getTopTechnicians();
-  const monthlyEventCounts = getMonthlyEventCounts();
-  const purposeBreakdown = calculatePurposeBreakdown();
-  const costMetrics = calculateCostMetrics();
-
   return (
-    <div className="dashboard-container">
-      <div className="content-header">
-        <h1>{getDisplayName()} - Analytics & Reports</h1>
-        <div className="header-actions">
-          <button 
-            className="btn btn-outline-primary"
-            onClick={() => navigate(`/${tenantId}`)}
-          >
-            <i className="fas fa-calendar-alt me-1"></i>
-            Calendar View
-          </button>
-        </div>
-      </div>
-      
-      {loading ? (
-        <div className="loading-container">
-          <div>Loading analytics data...</div>
-        </div>
-      ) : error ? (
-        <div className="error-message">
-          <h3>Error</h3>
-          <p>{error}</p>
-          <button className="btn btn-primary mt-3" onClick={() => navigate('/')}>
-            Return to Main Dashboard
-          </button>
-        </div>
-      ) : (
-        <div className="analytics-dashboard">
-          <div className="analytics-header">
-            <div className="date-range-picker">
-              <label className="filter-label">Time Range</label>
-              <select 
-                className="filter-select"
+    <div className="analytics-dashboard bg-gray-50 min-h-screen pb-10">
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <h1 className="text-2xl font-bold text-gray-900">{tenantName} - Analytics Dashboard</h1>
+            <div className="flex items-center space-x-4">
+              <select
                 value={timeRange}
                 onChange={(e) => setTimeRange(e.target.value)}
+                className="block w-40 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
               >
                 <option value="7days">Last 7 Days</option>
                 <option value="30days">Last 30 Days</option>
                 <option value="90days">Last 90 Days</option>
                 <option value="12months">Last 12 Months</option>
               </select>
+              <button
+                onClick={() => console.log('Switch to Calendar View')}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Calendar View
+              </button>
             </div>
           </div>
-          
-          <div className="stat-cards">
-            <div className="stat-card">
-              <div className="stat-title">Total Reservations</div>
-              <div className="stat-value">{metrics.totalEvents}</div>
-              <div className="stat-sub">in the selected period</div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      ) : error ? (
+        <div className="max-w-3xl mx-auto mt-8 px-4 py-6 bg-red-50 rounded-lg border border-red-200">
+          <h3 className="text-lg font-medium text-red-800">Error</h3>
+          <p className="mt-2 text-red-700">{error}</p>
+          <button
+            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            onClick={() => console.log('Return to Dashboard')}
+          >
+            Return to Main Dashboard
+          </button>
+        </div>
+      ) : (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Key Metrics Section */}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mt-8">
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
+                    <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Total Reservations</dt>
+                      <dd className="flex items-baseline">
+                        <div className="text-2xl font-semibold text-gray-900">317</div>
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
             </div>
-            
-            <div className="stat-card">
-              <div className="stat-title">Reservations per Day</div>
-              <div className="stat-value">{metrics.eventsPerDay}</div>
-              <div className="stat-sub">average</div>
+
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
+                    <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                    </svg>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Avg. Reservations/Day</dt>
+                      <dd className="flex items-baseline">
+                        <div className="text-2xl font-semibold text-gray-900">10.6</div>
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
             </div>
-            
-            <div className="stat-card">
-              <div className="stat-title">Utilization Rate</div>
-              <div className="stat-value">{metrics.utilizationRate}%</div>
-              <div className="stat-sub">of total capacity</div>
+
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 bg-yellow-500 rounded-md p-3">
+                    <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Utilization Rate</dt>
+                      <dd className="flex items-baseline">
+                        <div className="text-2xl font-semibold text-gray-900">76%</div>
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
             </div>
-            
-            <div className="stat-card">
-              <div className="stat-title">Active Equipment</div>
-              <div className="stat-value">{equipmentUtilization.filter(e => e.count > 0).length}</div>
-              <div className="stat-sub">of {resources.length} total</div>
+
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 bg-red-500 rounded-md p-3">
+                    <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Total Cost</dt>
+                      <dd className="flex items-baseline">
+                        <div className="text-2xl font-semibold text-gray-900">{formatCurrency(89500)}</div>
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          
-          {/* New Cost Summary Section */}
-          <div className="report-section">
-            <h2 className="section-title">Cost Summary</h2>
-            <div className="stat-cards">
-              <div className="stat-card">
-                <div className="stat-title">Total Cost</div>
-                <div className="stat-value">{formatCurrency(costMetrics.totalCost)}</div>
-                <div className="stat-sub">all events</div>
+
+          {/* Charts Section */}
+          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Purpose Breakdown */}
+            <div className="bg-white shadow rounded-lg overflow-hidden">
+              <div className="px-4 py-5 border-b border-gray-200 sm:px-6">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">Purpose Breakdown</h3>
               </div>
-              
-              <div className="stat-card">
-                <div className="stat-title">Average Cost</div>
-                <div className="stat-value">{formatCurrency(costMetrics.avgCost)}</div>
-                <div className="stat-sub">per event</div>
+              <div className="px-4 py-5 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-center justify-center h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={purposeData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {purposeData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => `${value}%`} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-              
-              <div className="stat-card">
-                <div className="stat-title">Utilization Cost</div>
-                <div className="stat-value">{formatCurrency(costMetrics.utilizationCost)}</div>
-                <div className="stat-sub">{purposeBreakdown.utilization} events</div>
+            </div>
+
+            {/* Monthly Trends */}
+            <div className="bg-white shadow rounded-lg overflow-hidden">
+              <div className="px-4 py-5 border-b border-gray-200 sm:px-6">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">Monthly Trends</h3>
               </div>
-              
-              <div className="stat-card">
-                <div className="stat-title">Maintenance Cost</div>
-                <div className="stat-value">{formatCurrency(costMetrics.maintenanceCost)}</div>
-                <div className="stat-sub">{purposeBreakdown.maintenance} events</div>
+              <div className="px-4 py-5 sm:p-6">
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={monthlyData}
+                      margin={{
+                        top: 5,
+                        right: 30,
+                        left: 20,
+                        bottom: 5,
+                      }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis yAxisId="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <Tooltip />
+                      <Legend />
+                      <Line
+                        yAxisId="left"
+                        type="monotone"
+                        dataKey="count"
+                        name="Reservations"
+                        stroke="#4285F4"
+                        activeDot={{ r: 8 }}
+                      />
+                      <Line yAxisId="right" type="monotone" dataKey="cost" name="Cost ($)" stroke="#EA4335" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
           </div>
-          
-          {/* Purpose Breakdown Section */}
-          <div className="report-section">
-            <h2 className="section-title">Purpose Breakdown</h2>
-            <div className="purpose-breakdown">
-              <div className="breakdown-bars">
-                <div className="breakdown-bar">
-                  <div className="bar-label">Utilization</div>
-                  <div className="bar-container">
-                    <div className="bar-fill utilization" style={{ width: `${purposeBreakdown.utilizationPercent}%` }}>
-                      {purposeBreakdown.utilizationPercent}%
+
+          {/* Equipment Utilization Table */}
+          <div className="mt-8">
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 border-b border-gray-200 sm:px-6">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">Equipment Utilization</h3>
+              </div>
+              <div className="flex flex-col">
+                <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                  <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
+                    <div className="overflow-hidden">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Equipment
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Utilization
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Total Cost
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Purpose Breakdown
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {equipmentData.map((item, index) => (
+                            <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {item.name}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div className="flex items-center">
+                                  <div className="w-full bg-gray-200 rounded-full h-2.5 mr-2 max-w-[150px]">
+                                    <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${item.utilization}%` }}></div>
+                                  </div>
+                                  <span>{item.utilization}%</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {formatCurrency(item.totalCost)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <div className="flex h-2 max-w-[200px] rounded-full overflow-hidden">
+                                  <div
+                                    className="bg-blue-500"
+                                    style={{ width: `${item.utilization}%` }}
+                                  ></div>
+                                  <div
+                                    className="bg-yellow-500"
+                                    style={{ width: `${item.maintenance}%` }}
+                                  ></div>
+                                  <div
+                                    className="bg-red-500"
+                                    style={{ width: `${item.broken}%` }}
+                                  ></div>
+                                </div>
+                                <div className="text-xs mt-1">
+                                  <span className="text-blue-600 mr-2">Utilization: {item.utilization}%</span>
+                                  <span className="text-yellow-600 mr-2">Maintenance: {item.maintenance}%</span>
+                                  <span className="text-red-600">Broken: {item.broken}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                  <div className="bar-count">{purposeBreakdown.utilization} events</div>
-                </div>
-                
-                <div className="breakdown-bar">
-                  <div className="bar-label">Maintenance</div>
-                  <div className="bar-container">
-                    <div className="bar-fill maintenance" style={{ width: `${purposeBreakdown.maintenancePercent}%` }}>
-                      {purposeBreakdown.maintenancePercent}%
-                    </div>
-                  </div>
-                  <div className="bar-count">{purposeBreakdown.maintenance} events</div>
-                </div>
-                
-                <div className="breakdown-bar">
-                  <div className="bar-label">Broken</div>
-                  <div className="bar-container">
-                    <div className="bar-fill broken" style={{ width: `${purposeBreakdown.brokenPercent}%` }}>
-                      {purposeBreakdown.brokenPercent}%
-                    </div>
-                  </div>
-                  <div className="bar-count">{purposeBreakdown.broken} events</div>
-                </div>
-              </div>
-              
-              <div className="breakdown-stats">
-                <div className="breakdown-stat">
-                  <div className="stat-title">Downtime Ratio</div>
-                  <div className="stat-value">{metrics.downtimeRatio}%</div>
-                  <div className="stat-sub">maintenance + broken events</div>
                 </div>
               </div>
             </div>
-          </div>
-          
-          <div className="report-section">
-            <h2 className="section-title">Equipment Utilization & Costs</h2>
-            <table className="report-table">
-              <thead>
-                <tr>
-                  <th>Equipment</th>
-                  <th>Total Events</th>
-                  <th>Utilization %</th>
-                  <th>Total Cost</th>
-                  <th>Avg Cost/Event</th>
-                  <th>Purpose Breakdown</th>
-                </tr>
-              </thead>
-              <tbody>
-                {equipmentUtilization.map((equipment) => (
-                  <tr key={equipment.id}>
-                    <td>{equipment.name}</td>
-                    <td>{equipment.count}</td>
-                    <td>
-                      <div className="utilization-bar" style={{ width: '100px', display: 'inline-block', marginRight: '10px' }}>
-                        <div className="utilization-fill" style={{ width: `${equipment.utilization}%` }}></div>
-                      </div>
-                      {equipment.utilization}%
-                    </td>
-                    <td>{formatCurrency(equipment.totalCost)}</td>
-                    <td>{formatCurrency(equipment.avgCost)}</td>
-                    <td>
-                      <div className="purpose-mini-chart">
-                        <div className="mini-bar utilization" style={{ width: `${equipment.count ? (equipment.utilizationCount / equipment.count) * 100 : 0}%` }}></div>
-                        <div className="mini-bar maintenance" style={{ width: `${equipment.count ? (equipment.maintenanceCount / equipment.count) * 100 : 0}%` }}></div>
-                        <div className="mini-bar broken" style={{ width: `${equipment.count ? (equipment.brokenCount / equipment.count) * 100 : 0}%` }}></div>
-                      </div>
-                      <div className="purpose-mini-legend">
-                        U: {equipment.utilizationCount} | M: {equipment.maintenanceCount} | B: {equipment.brokenCount}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                
-                {equipmentUtilization.length === 0 && (
-                  <tr>
-                    <td colSpan="6" className="text-center py-4">
-                      <i className="fas fa-info-circle me-2"></i>
-                      No equipment utilization data available
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          
-          <div className="report-section">
-            <h2 className="section-title">Top Technicians</h2>
-            {topTechnicians.length > 0 ? (
-              <table className="report-table">
-                <thead>
-                  <tr>
-                    <th>Technician</th>
-                    <th>Reservations</th>
-                    <th>Total Cost</th>
-                    <th>Avg Cost/Event</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topTechnicians.map((technician, index) => (
-                    <tr key={index}>
-                      <td>{technician.name}</td>
-                      <td>{technician.count}</td>
-                      <td>{formatCurrency(technician.totalCost)}</td>
-                      <td>{formatCurrency(technician.avgCost)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="text-center py-4">
-                <i className="fas fa-user-slash me-2"></i>
-                No technician data available
-              </div>
-            )}
-          </div>
-          
-          <div className="report-section">
-            <h2 className="section-title">Monthly Trends</h2>
-            <table className="report-table">
-              <thead>
-                <tr>
-                  <th>Month</th>
-                  <th>Reservations</th>
-                  <th>Total Cost</th>
-                  <th>Activity Trend</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monthlyEventCounts.map((month, index) => (
-                  <tr key={index}>
-                    <td>{month.name} {month.year}</td>
-                    <td>{month.count}</td>
-                    <td>{formatCurrency(month.cost)}</td>
-                    <td>
-                      <div className="utilization-bar" style={{ width: '150px', display: 'inline-block' }}>
-                        <div 
-                          className="utilization-fill" 
-                          style={{ 
-                            width: `${Math.min(month.count * 5, 100)}%`,
-                            backgroundColor: month.count > 0 ? '#2196F3' : '#e9ecef'
-                          }}
-                        ></div>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          <div className="report-section">
-            <h2 className="section-title">Recent Reservations</h2>
-            <table className="report-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Title</th>
-                  <th>Equipment</th>
-                  <th>Purpose</th>
-                  <th>Cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                {getFilteredEvents().slice(0, 10).map((event, index) => (
-                  <tr key={index}>
-                    <td>{new Date(event.start).toLocaleDateString()}</td>
-                    <td>{event.title}</td>
-                    <td>{event.equipment || resources.find(r => r.id === event.resourceId)?.title || 'Unknown'}</td>
-                    <td>
-                      <span className={`purpose-badge ${(event.purpose || 'Utilization').toLowerCase()}`}>
-                        {event.purpose || 'Utilization'}
-                      </span>
-                    </td>
-                    <td>{formatCurrency(event.cost || 0)}</td>
-                  </tr>
-                ))}
-                
-                {getFilteredEvents().length === 0 && (
-                  <tr>
-                    <td colSpan="5" className="text-center py-4">
-                      <i className="fas fa-calendar-times me-2"></i>
-                      No reservations found in the selected time period
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
           </div>
         </div>
       )}
@@ -699,4 +339,4 @@ function Analytics() {
   );
 }
 
-export default Analytics;
+export default AnalyticsDashboard;
