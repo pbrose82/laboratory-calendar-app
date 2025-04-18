@@ -48,12 +48,22 @@ function TenantCalendar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [events, setEvents] = useState([]);
+  const [filteredEvents, setFilteredEvents] = useState([]);
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tenantName, setTenantName] = useState('');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [showWeekends, setShowWeekends] = useState(true);
+  
+  // New filter states
+  const [equipmentFilter, setEquipmentFilter] = useState('all');
+  const [technicianFilter, setTechnicianFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  
+  // Track unique values for filters
+  const [uniqueEquipment, setUniqueEquipment] = useState([]);
+  const [uniqueTechnicians, setUniqueTechnicians] = useState([]);
   
   // Reference to track if component is mounted
   const isMounted = useRef(true);
@@ -74,9 +84,14 @@ function TenantCalendar() {
         // For demo tenant, check if we have saved data in localStorage
         const savedDemoData = localStorage.getItem('demo-tenant-events');
         if (savedDemoData) {
-          setEvents(JSON.parse(savedDemoData));
+          const parsedEvents = JSON.parse(savedDemoData);
+          setEvents(parsedEvents);
+          updateFilterOptions(parsedEvents);
+          applyFilters(parsedEvents);
         } else {
           setEvents(demoTenantEvents);
+          updateFilterOptions(demoTenantEvents);
+          applyFilters(demoTenantEvents);
           // Save initial demo data to localStorage
           localStorage.setItem('demo-tenant-events', JSON.stringify(demoTenantEvents));
         }
@@ -101,6 +116,10 @@ function TenantCalendar() {
         const formattedEvents = ensureISODateFormat(tenantData.events || []);
         setEvents(formattedEvents);
         
+        // Update filter options and apply filters
+        updateFilterOptions(formattedEvents);
+        applyFilters(formattedEvents);
+        
         setResources(tenantData.resources || []);
         if (!tenantName) {
           setTenantName(tenantData.name || tenantId);
@@ -120,6 +139,99 @@ function TenantCalendar() {
         setLoading(false);
       }
     }
+  };
+
+  // Extract unique values for filter dropdowns
+  const updateFilterOptions = (eventsData) => {
+    // Extract unique equipment names
+    const equipmentSet = new Set();
+    eventsData.forEach(event => {
+      if (event.equipment) {
+        equipmentSet.add(event.equipment);
+      } else if (event.extendedProps && event.extendedProps.equipment) {
+        equipmentSet.add(event.extendedProps.equipment);
+      }
+    });
+    
+    // Extract unique technician names
+    const technicianSet = new Set();
+    eventsData.forEach(event => {
+      if (event.technician) {
+        technicianSet.add(event.technician);
+      } else if (event.extendedProps && event.extendedProps.technician) {
+        technicianSet.add(event.extendedProps.technician);
+      }
+    });
+    
+    setUniqueEquipment(Array.from(equipmentSet).sort());
+    setUniqueTechnicians(Array.from(technicianSet).sort());
+  };
+
+  // Apply filters to the events
+  const applyFilters = (eventsData) => {
+    let filtered = [...eventsData];
+    
+    // Apply equipment filter
+    if (equipmentFilter !== 'all') {
+      filtered = filtered.filter(event => {
+        const equipment = event.equipment || (event.extendedProps && event.extendedProps.equipment);
+        return equipment === equipmentFilter;
+      });
+    }
+    
+    // Apply technician filter
+    if (technicianFilter !== 'all') {
+      filtered = filtered.filter(event => {
+        const technician = event.technician || (event.extendedProps && event.extendedProps.technician);
+        return technician === technicianFilter;
+      });
+    }
+    
+    // Apply status filter - based on date
+    if (statusFilter !== 'all') {
+      const now = new Date();
+      
+      filtered = filtered.filter(event => {
+        try {
+          const startDate = new Date(event.start);
+          const endDate = new Date(event.end);
+          
+          if (statusFilter === 'upcoming') {
+            return startDate > now;
+          } else if (statusFilter === 'ongoing') {
+            return startDate <= now && endDate >= now;
+          } else if (statusFilter === 'completed') {
+            return endDate < now;
+          }
+          return true;
+        } catch (e) {
+          console.warn('Error parsing event dates for status filter:', e);
+          return true;
+        }
+      });
+    }
+    
+    setFilteredEvents(filtered);
+  };
+
+  // Handle filter changes
+  const handleEquipmentFilterChange = (e) => {
+    setEquipmentFilter(e.target.value);
+  };
+  
+  const handleTechnicianFilterChange = (e) => {
+    setTechnicianFilter(e.target.value);
+  };
+  
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value);
+  };
+  
+  // Reset all filters
+  const resetFilters = () => {
+    setEquipmentFilter('all');
+    setTechnicianFilter('all');
+    setStatusFilter('all');
   };
 
   // Initial data load and auth check
@@ -152,6 +264,11 @@ function TenantCalendar() {
       clearInterval(refreshInterval);
     };
   }, [tenantId]);
+  
+  // Update filtered events when filters or events change
+  useEffect(() => {
+    applyFilters(events);
+  }, [equipmentFilter, technicianFilter, statusFilter, events]);
 
   const handleDateSelect = async (selectInfo) => {
     const title = prompt('Please enter a new event title:');
@@ -346,19 +463,10 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
       <div className="content-header">
         <h1>{getDisplayName()}</h1>
         <div className="header-actions">
-          {/* Weekend toggle button */}
-          <button 
-            className={`btn ${showWeekends ? 'btn-outline-primary' : 'btn-primary'}`}
-            onClick={toggleWeekends}
-          >
-            <i className="fas fa-calendar-week me-1"></i>
-            {showWeekends ? "Hide Weekends" : "Show Weekends"}
-          </button>
-          
           {/* Admin button if authenticated */}
           {isAdminAuthenticated && (
             <button 
-              className="btn btn-outline-primary ms-2"
+              className="btn btn-outline-primary"
               onClick={() => navigate('/admin')}
             >
               <i className="fas fa-cog me-1"></i>
@@ -367,6 +475,84 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
           )}
         </div>
       </div>
+
+      {/* New Filter Controls */}
+      {!loading && !error && (
+        <div className="calendar-filters">
+          <div className="filter-row">
+            <div className="filter-group">
+              <label htmlFor="equipmentFilter">Equipment:</label>
+              <select 
+                id="equipmentFilter" 
+                value={equipmentFilter} 
+                onChange={handleEquipmentFilterChange}
+                className="filter-select"
+              >
+                <option value="all">All Equipment</option>
+                {uniqueEquipment.map(item => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="filter-group">
+              <label htmlFor="technicianFilter">Technician:</label>
+              <select 
+                id="technicianFilter" 
+                value={technicianFilter} 
+                onChange={handleTechnicianFilterChange}
+                className="filter-select"
+              >
+                <option value="all">All Technicians</option>
+                {uniqueTechnicians.map(item => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="filter-group">
+              <label htmlFor="statusFilter">Status:</label>
+              <select 
+                id="statusFilter" 
+                value={statusFilter} 
+                onChange={handleStatusFilterChange}
+                className="filter-select"
+              >
+                <option value="all">All Status</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="ongoing">Ongoing</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+            
+            <div className="filter-actions">
+              <button 
+                className="btn btn-sm btn-outline-secondary"
+                onClick={resetFilters}
+              >
+                <i className="fas fa-undo me-1"></i>
+                Reset Filters
+              </button>
+              
+              <button 
+                className={`btn btn-sm ${showWeekends ? 'btn-outline-primary' : 'btn-primary'}`}
+                onClick={toggleWeekends}
+              >
+                <i className="fas fa-calendar-week me-1"></i>
+                {showWeekends ? "Hide Weekends" : "Show Weekends"}
+              </button>
+            </div>
+          </div>
+          
+          {/* Filter summary */}
+          <div className="filter-summary">
+            Showing {filteredEvents.length} of {events.length} events
+            {equipmentFilter !== 'all' && ` • Equipment: ${equipmentFilter}`}
+            {technicianFilter !== 'all' && ` • Technician: ${technicianFilter}`}
+            {statusFilter !== 'all' && ` • Status: ${statusFilter}`}
+          </div>
+        </div>
+      )}
       
       {loading ? (
         <div className="laboratory-calendar loading-container">
@@ -400,7 +586,7 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
             eventClick={handleEventClick}
             eventDrop={handleEventDrop}
             eventRemove={handleEventRemove}
-            events={events}
+            events={filteredEvents}
             resources={resources}
             height="auto"
             slotMinTime="06:00:00" // Start calendar at 6am
