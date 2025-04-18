@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Card, Row, Col, Select, Button, Typography, Spin, Alert, 
-  Table, Statistic, Tag, Space, Divider, Progress
+  Table, Statistic, Tag, Space, Divider, Progress, Dropdown, Menu
 } from 'antd';
 import {
   BarChartOutlined, PieChartOutlined, CalendarOutlined, DollarOutlined,
-  CheckCircleOutlined, ExclamationOutlined, CloseCircleOutlined
+  CheckCircleOutlined, ExclamationOutlined, CloseCircleOutlined,
+  DownloadOutlined, FileExcelOutlined, FilePdfOutlined, ClockCircleOutlined
 } from '@ant-design/icons';
 import { fetchTenant } from '../services/apiClient';
 import './Analytics.css';
@@ -139,20 +140,37 @@ function Analytics() {
     });
   };
 
-  // Calculate equipment utilization
+  // Get the total time period in hours for the selected range
+  const getTotalTimePeriodHours = () => {
+    switch (timeRange) {
+      case '7days': return 7 * 24;
+      case '30days': return 30 * 24;
+      case '90days': return 90 * 24;
+      case '12months': return 365 * 24;
+      default: return 30 * 24;
+    }
+  };
+
+  // Calculate equipment utilization with idle time, uptime and downtime percentages
   const calculateEquipmentUtilization = () => {
     if (!resources || resources.length === 0) {
       return [];
     }
     
     const filteredEvents = getFilteredEvents();
+    const totalPeriodHours = getTotalTimePeriodHours();
     
     if (filteredEvents.length === 0) {
       return resources.map(resource => ({
         name: resource.title,
         id: resource.id,
         count: 0,
-        utilization: 0,
+        utilizationHours: 0,
+        maintenanceHours: 0,
+        brokenHours: 0,
+        idleHours: totalPeriodHours, // All hours are idle if no events
+        uptimePercent: 100, // Everything is up when no events (assume available)
+        downtimePercent: 0,
         totalCost: 0,
         avgCost: 0,
         utilizationCount: 0,
@@ -167,10 +185,35 @@ function Analytics() {
         event.equipment === resource.title
       );
       
-      // Calculate purpose counts
+      // Calculate purpose counts and hours
       const utilizationEvents = resourceEvents.filter(e => (e.purpose || 'Utilization') === 'Utilization');
       const maintenanceEvents = resourceEvents.filter(e => e.purpose === 'Maintenance');
       const brokenEvents = resourceEvents.filter(e => e.purpose === 'Broken');
+      
+      // Calculate hours for each category by summing event durations
+      const calculateHours = (eventList) => {
+        return eventList.reduce((total, event) => {
+          const start = new Date(event.start);
+          const end = new Date(event.end || event.start);
+          const durationHours = (end - start) / (1000 * 60 * 60); // Convert milliseconds to hours
+          return total + (isNaN(durationHours) ? 0 : durationHours);
+        }, 0);
+      };
+      
+      const utilizationHours = calculateHours(utilizationEvents);
+      const maintenanceHours = calculateHours(maintenanceEvents);
+      const brokenHours = calculateHours(brokenEvents);
+      
+      // Calculate idle time
+      const occupiedHours = utilizationHours + maintenanceHours + brokenHours;
+      const idleHours = Math.max(0, totalPeriodHours - occupiedHours);
+      
+      // Calculate uptime and downtime percentages
+      const uptimeHours = utilizationHours + idleHours;
+      const downtimeHours = maintenanceHours + brokenHours;
+      
+      const uptimePercent = Math.round((uptimeHours / totalPeriodHours) * 100);
+      const downtimePercent = Math.round((downtimeHours / totalPeriodHours) * 100);
       
       // Calculate cost metrics
       const totalCost = resourceEvents.reduce((sum, event) => sum + (Number(event.cost) || 0), 0);
@@ -182,6 +225,12 @@ function Analytics() {
         count: resourceEvents.length,
         utilization: filteredEvents.length > 0 ? 
           Math.round((resourceEvents.length / filteredEvents.length) * 100) : 0,
+        utilizationHours: Math.round(utilizationHours * 100) / 100, // Round to 2 decimal places
+        maintenanceHours: Math.round(maintenanceHours * 100) / 100,
+        brokenHours: Math.round(brokenHours * 100) / 100,
+        idleHours: Math.round(idleHours * 100) / 100,
+        uptimePercent: uptimePercent,
+        downtimePercent: downtimePercent,
         totalCost: totalCost,
         avgCost: avgCost,
         utilizationCount: utilizationEvents.length,
@@ -364,6 +413,49 @@ function Analytics() {
     };
   };
 
+  // Calculate total hours for all equipment combined
+  const calculateTotalHours = () => {
+    const equipment = calculateEquipmentUtilization();
+    const totalHours = {
+      utilizationHours: 0,
+      maintenanceHours: 0,
+      brokenHours: 0,
+      idleHours: 0,
+      totalHours: 0
+    };
+    
+    equipment.forEach(item => {
+      totalHours.utilizationHours += item.utilizationHours;
+      totalHours.maintenanceHours += item.maintenanceHours;
+      totalHours.brokenHours += item.brokenHours;
+      totalHours.idleHours += item.idleHours;
+    });
+    
+    totalHours.totalHours = totalHours.utilizationHours + totalHours.maintenanceHours + 
+                           totalHours.brokenHours + totalHours.idleHours;
+    
+    // Calculate percentages
+    if (totalHours.totalHours > 0) {
+      totalHours.utilizationPercent = Math.round((totalHours.utilizationHours / totalHours.totalHours) * 100);
+      totalHours.maintenancePercent = Math.round((totalHours.maintenanceHours / totalHours.totalHours) * 100);
+      totalHours.brokenPercent = Math.round((totalHours.brokenHours / totalHours.totalHours) * 100);
+      totalHours.idlePercent = Math.round((totalHours.idleHours / totalHours.totalHours) * 100);
+      
+      // Calculate uptime and downtime
+      totalHours.uptimePercent = Math.round(((totalHours.utilizationHours + totalHours.idleHours) / totalHours.totalHours) * 100);
+      totalHours.downtimePercent = Math.round(((totalHours.maintenanceHours + totalHours.brokenHours) / totalHours.totalHours) * 100);
+    } else {
+      totalHours.utilizationPercent = 0;
+      totalHours.maintenancePercent = 0;
+      totalHours.brokenPercent = 0;
+      totalHours.idlePercent = 100;
+      totalHours.uptimePercent = 100;
+      totalHours.downtimePercent = 0;
+    }
+    
+    return totalHours;
+  };
+
   // Get number of days in the selected time range
   const getTimeRangeDays = () => {
     switch (timeRange) {
@@ -396,6 +488,11 @@ function Analytics() {
     }).format(amount);
   };
 
+  // Format hours for display
+  const formatHours = (hours) => {
+    return `${Math.round(hours * 100) / 100} h`;
+  };
+
   // Get purpose tag
   const getPurposeTag = (purpose) => {
     switch(purpose) {
@@ -408,13 +505,125 @@ function Analytics() {
     }
   };
 
-  // Calculate data for analytics
+  // Generate exported CSV content from data
+  const generateCSV = (data, columns) => {
+    // Create header row
+    const header = columns.map(col => col.title || col.key || '').join(',');
+    
+    // Create data rows
+    const rows = data.map(record => {
+      return columns.map(col => {
+        // Handle column render functions for custom formatting
+        if (col.render) {
+          const value = col.dataIndex ? record[col.dataIndex] : record;
+          // Remove HTML tags from rendered content
+          const renderedValue = col.render(value, record, 0);
+          return typeof renderedValue === 'object' ? 'N/A' : renderedValue;
+        } else if (col.dataIndex) {
+          return record[col.dataIndex] || '';
+        } else if (col.key && record[col.key]) {
+          return record[col.key] || '';
+        }
+        return '';
+      }).join(',');
+    }).join('\n');
+    
+    return `${header}\n${rows}`;
+  };
+
+  // Export equipment utilization data to CSV
+  const exportEquipmentCSV = () => {
+    const data = calculateEquipmentUtilization();
+    const columns = [
+      { title: 'Equipment', dataIndex: 'name' },
+      { title: 'Utilization Hours', dataIndex: 'utilizationHours' },
+      { title: 'Maintenance Hours', dataIndex: 'maintenanceHours' },
+      { title: 'Broken Hours', dataIndex: 'brokenHours' },
+      { title: 'Idle Hours', dataIndex: 'idleHours' },
+      { title: 'Uptime %', dataIndex: 'uptimePercent' },
+      { title: 'Downtime %', dataIndex: 'downtimePercent' },
+      { title: 'Total Cost', key: 'totalCost', render: (value) => formatCurrency(value) }
+    ];
+    
+    const csvContent = generateCSV(data, columns);
+    downloadCSV(csvContent, `equipment-utilization-${timeRange}.csv`);
+  };
+
+  // Export technician data to CSV
+  const exportTechnicianCSV = () => {
+    const data = getTopTechnicians();
+    const columns = [
+      { title: 'Technician', dataIndex: 'name' },
+      { title: 'Reservations', dataIndex: 'count' },
+      { title: 'Total Cost', key: 'totalCost', render: (value) => formatCurrency(value) },
+      { title: 'Avg Cost/Event', key: 'avgCost', render: (value) => formatCurrency(value) }
+    ];
+    
+    const csvContent = generateCSV(data, columns);
+    downloadCSV(csvContent, `technician-data-${timeRange}.csv`);
+  };
+
+  // Export monthly trends to CSV
+  const exportMonthlyCSV = () => {
+    const data = getMonthlyEventCounts();
+    const columns = [
+      { title: 'Month', key: 'month', render: (_, record) => `${record.name} ${record.year}` },
+      { title: 'Reservations', dataIndex: 'count' },
+      { title: 'Total Cost', key: 'cost', render: (value) => formatCurrency(value) }
+    ];
+    
+    const csvContent = generateCSV(data, columns);
+    downloadCSV(csvContent, `monthly-trends-${timeRange}.csv`);
+  };
+
+  // Export recent events to CSV
+  const exportEventsCSV = () => {
+    const data = getFilteredEvents();
+    const columns = [
+      { title: 'Date', key: 'date', render: (_, record) => new Date(record.start).toLocaleDateString() },
+      { title: 'Title', dataIndex: 'title' },
+      { title: 'Equipment', key: 'equipment', render: (_, record) => record.equipment || resources.find(r => r.id === record.resourceId)?.title || 'Unknown' },
+      { title: 'Purpose', key: 'purpose', render: (_, record) => record.purpose || 'Utilization' },
+      { title: 'Cost', key: 'cost', render: (_, record) => formatCurrency(record.cost || 0) }
+    ];
+    
+    const csvContent = generateCSV(data, columns);
+    downloadCSV(csvContent, `events-${timeRange}.csv`);
+  };
+
+  // Helper to download CSV file
+  const downloadCSV = (csvContent, filename) => {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export full analytics report to CSV
+  const exportFullReport = () => {
+    // Create a zip file with all reports
+    // For simplicity, we'll just export all data separately
+    exportEquipmentCSV();
+    setTimeout(() => exportTechnicianCSV(), 500);
+    setTimeout(() => exportMonthlyCSV(), 1000);
+    setTimeout(() => exportEventsCSV(), 1500);
+  };
+
+  // Data for charts and tables
   const metrics = calculateMetrics();
   const equipmentUtilization = calculateEquipmentUtilization();
   const topTechnicians = getTopTechnicians();
   const monthlyEventCounts = getMonthlyEventCounts();
   const purposeBreakdown = calculatePurposeBreakdown();
   const costMetrics = calculateCostMetrics();
+  const totalHours = calculateTotalHours();
 
   // Table columns for Equipment Utilization
   const equipmentColumns = [
@@ -425,56 +634,46 @@ function Analytics() {
       sorter: (a, b) => a.name.localeCompare(b.name),
     },
     {
-      title: 'Total Events',
-      dataIndex: 'count',
-      key: 'count',
-      sorter: (a, b) => a.count - b.count,
+      title: 'Utilization [h]',
+      dataIndex: 'utilizationHours',
+      key: 'utilizationHours',
+      render: (hours) => formatHours(hours),
+      sorter: (a, b) => a.utilizationHours - b.utilizationHours,
     },
     {
-      title: 'Utilization %',
-      key: 'utilization',
-      render: (_, record) => (
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Progress 
-            percent={record.utilization} 
-            size="small" 
-            style={{ width: 120, marginRight: 12 }}
-          />
-          <span>{record.utilization}%</span>
-        </div>
-      ),
-      sorter: (a, b) => a.utilization - b.utilization,
+      title: 'Maintenance [h]',
+      dataIndex: 'maintenanceHours',
+      key: 'maintenanceHours',
+      render: (hours) => formatHours(hours),
+      sorter: (a, b) => a.maintenanceHours - b.maintenanceHours,
     },
     {
-      title: 'Total Cost',
-      key: 'totalCost',
-      render: (_, record) => formatCurrency(record.totalCost),
-      sorter: (a, b) => a.totalCost - b.totalCost,
+      title: 'Broken [h]',
+      dataIndex: 'brokenHours',
+      key: 'brokenHours',
+      render: (hours) => formatHours(hours),
+      sorter: (a, b) => a.brokenHours - b.brokenHours,
     },
     {
-      title: 'Avg Cost/Event',
-      key: 'avgCost',
-      render: (_, record) => formatCurrency(record.avgCost),
-      sorter: (a, b) => a.avgCost - b.avgCost,
+      title: 'Idle [h]',
+      dataIndex: 'idleHours',
+      key: 'idleHours',
+      render: (hours) => formatHours(hours),
+      sorter: (a, b) => a.idleHours - b.idleHours,
     },
     {
-      title: 'Purpose Breakdown',
-      key: 'purposeBreakdown',
-      render: (_, record) => {
-        const total = record.count || 1; // Avoid division by zero
-        return (
-          <div>
-            <div className="purpose-mini-chart">
-              <div className="mini-bar utilization" style={{ width: `${(record.utilizationCount / total) * 100}%` }}></div>
-              <div className="mini-bar maintenance" style={{ width: `${(record.maintenanceCount / total) * 100}%` }}></div>
-              <div className="mini-bar broken" style={{ width: `${(record.brokenCount / total) * 100}%` }}></div>
-            </div>
-            <div className="purpose-mini-legend">
-              U: {record.utilizationCount} | M: {record.maintenanceCount} | B: {record.brokenCount}
-            </div>
-          </div>
-        );
-      },
+      title: 'Uptime [%]',
+      dataIndex: 'uptimePercent',
+      key: 'uptimePercent',
+      render: (percent) => `${percent}%`,
+      sorter: (a, b) => a.uptimePercent - b.uptimePercent,
+    },
+    {
+      title: 'Downtime [%]',
+      dataIndex: 'downtimePercent',
+      key: 'downtimePercent',
+      render: (percent) => `${percent}%`,
+      sorter: (a, b) => a.downtimePercent - b.downtimePercent,
     },
   ];
 
@@ -568,12 +767,54 @@ function Analytics() {
     },
   ];
 
+  // Calculate data for the Instrument bar chart
+  const equipmentBarChartData = equipmentUtilization.slice(0, 10).map(item => ({
+    name: item.name,
+    utilization: item.utilizationHours,
+    maintenance: item.maintenanceHours,
+    broken: item.brokenHours,
+    idle: item.idleHours
+  }));
+
+  // Calculate data for the Up vs Down bar chart
+  const uptimeDowntimeData = [
+    { name: 'Uptime', hours: totalHours.utilizationHours + totalHours.idleHours, percent: totalHours.uptimePercent },
+    { name: 'Downtime', hours: totalHours.maintenanceHours + totalHours.brokenHours, percent: totalHours.downtimePercent },
+  ];
+
+  // Export dropdown menu
+  const exportMenu = (
+    <Menu>
+      <Menu.Item key="csv-equipment" onClick={exportEquipmentCSV}>
+        <FileExcelOutlined /> Equipment Utilization Data
+      </Menu.Item>
+      <Menu.Item key="csv-technicians" onClick={exportTechnicianCSV}>
+        <FileExcelOutlined /> Technician Data
+      </Menu.Item>
+      <Menu.Item key="csv-monthly" onClick={exportMonthlyCSV}>
+        <FileExcelOutlined /> Monthly Trends
+      </Menu.Item>
+      <Menu.Item key="csv-events" onClick={exportEventsCSV}>
+        <FileExcelOutlined /> Event Data
+      </Menu.Item>
+      <Menu.Divider />
+      <Menu.Item key="csv-all" onClick={exportFullReport}>
+        <FileExcelOutlined /> Export All Data
+      </Menu.Item>
+    </Menu>
+  );
+
   return (
     <div className="analytics-container">
       <Card className="header-card">
         <div className="header-content">
-          <Title level={3}>{getDisplayName()} - Analytics & Reports</Title>
+          <Title level={3}>{getDisplayName()} - Equipment Utilization Report</Title>
           <div className="header-actions">
+            <Dropdown overlay={exportMenu} placement="bottomRight">
+              <Button icon={<DownloadOutlined />}>
+                Export Reports
+              </Button>
+            </Dropdown>
             <Button 
               type="primary"
               icon={<CalendarOutlined />}
@@ -609,7 +850,7 @@ function Analytics() {
         <div className="analytics-content">
           <Card className="filter-card">
             <div className="date-range-picker">
-              <Text strong>Time Range:</Text>
+              <Text strong>Report Time Period:</Text>
               <Select 
                 value={timeRange}
                 onChange={(value) => setTimeRange(value)}
@@ -623,35 +864,14 @@ function Analytics() {
             </div>
           </Card>
           
+          {/* Overall Summary Stats */}
           <Row gutter={16} className="stats-row">
             <Col xs={24} sm={12} md={6}>
               <Card>
                 <Statistic
-                  title="Total Reservations"
-                  value={metrics.totalEvents}
+                  title="Total Equipment"
+                  value={resources.length}
                   prefix={<BarChartOutlined />}
-                  suffix={<Text type="secondary" style={{ fontSize: '14px' }}>in period</Text>}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card>
-                <Statistic
-                  title="Reservations Per Day"
-                  value={metrics.eventsPerDay}
-                  precision={1}
-                  prefix={<CalendarOutlined />}
-                  suffix={<Text type="secondary" style={{ fontSize: '14px' }}>avg</Text>}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card>
-                <Statistic
-                  title="Utilization Rate"
-                  value={metrics.utilizationRate}
-                  prefix={<PieChartOutlined />}
-                  suffix="%"
                 />
               </Card>
             </Col>
@@ -664,117 +884,160 @@ function Analytics() {
                 />
               </Card>
             </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Uptime %"
+                  value={totalHours.uptimePercent}
+                  suffix="%"
+                  valueStyle={{ color: totalHours.uptimePercent > 75 ? '#3f8600' : '#faad14' }}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Downtime %"
+                  value={totalHours.downtimePercent}
+                  suffix="%"
+                  valueStyle={{ color: totalHours.downtimePercent < 25 ? '#3f8600' : '#f5222d' }}
+                />
+              </Card>
+            </Col>
           </Row>
           
-          {/* Cost Summary Section */}
-          <Card title="Cost Summary" className="section-card">
+          {/* Time Distribution Section */}
+          <Card 
+            title="Equipment Time Distribution" 
+            className="section-card"
+            extra={
+              <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportEquipmentCSV()}>
+                Export
+              </Button>
+            }
+          >
             <Row gutter={16}>
-              <Col xs={24} sm={12} md={6}>
-                <Card bordered={false}>
-                  <Statistic
-                    title="Total Cost"
-                    value={costMetrics.totalCost}
-                    precision={0}
-                    prefix={<DollarOutlined />}
-                    formatter={(value) => formatCurrency(value)}
-                  />
+              <Col xs={24} md={12}>
+                <Card bordered={false} className="hour-stats-card">
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Statistic
+                        title="Total Utilization [h]"
+                        value={formatHours(totalHours.utilizationHours)}
+                        prefix={<BarChartOutlined style={{ color: '#1890ff' }} />}
+                      />
+                    </Col>
+                    <Col span={12}>
+                      <Statistic
+                        title="Total Maintenance [h]"
+                        value={formatHours(totalHours.maintenanceHours)}
+                        prefix={<ExclamationOutlined style={{ color: '#faad14' }} />}
+                      />
+                    </Col>
+                  </Row>
+                  <Row gutter={16} style={{ marginTop: '20px' }}>
+                    <Col span={12}>
+                      <Statistic
+                        title="Total Broken [h]"
+                        value={formatHours(totalHours.brokenHours)}
+                        prefix={<CloseCircleOutlined style={{ color: '#f5222d' }} />}
+                      />
+                    </Col>
+                    <Col span={12}>
+                      <Statistic
+                        title="Total Idle [h]"
+                        value={formatHours(totalHours.idleHours)}
+                        prefix={<ClockCircleOutlined style={{ color: '#52c41a' }} />}
+                      />
+                    </Col>
+                  </Row>
                 </Card>
               </Col>
-              <Col xs={24} sm={12} md={6}>
-                <Card bordered={false}>
-                  <Statistic
-                    title="Average Cost"
-                    value={costMetrics.avgCost}
-                    precision={0}
-                    prefix={<DollarOutlined />}
-                    formatter={(value) => formatCurrency(value)}
-                    suffix={<Text type="secondary" style={{ fontSize: '14px' }}>per event</Text>}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} md={6}>
-                <Card bordered={false}>
-                  <Statistic
-                    title="Utilization Cost"
-                    value={costMetrics.utilizationCost}
-                    precision={0}
-                    prefix={<DollarOutlined />}
-                    formatter={(value) => formatCurrency(value)}
-                    suffix={<Text type="secondary" style={{ fontSize: '14px' }}>{purposeBreakdown.utilization} events</Text>}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} md={6}>
-                <Card bordered={false}>
-                  <Statistic
-                    title="Maintenance Cost"
-                    value={costMetrics.maintenanceCost}
-                    precision={0}
-                    prefix={<DollarOutlined />}
-                    formatter={(value) => formatCurrency(value)}
-                    suffix={<Text type="secondary" style={{ fontSize: '14px' }}>{purposeBreakdown.maintenance} events</Text>}
-                  />
-                </Card>
+              <Col xs={24} md={12}>
+                <div className="uptime-downtime-chart">
+                  <h4>Uptime vs Downtime</h4>
+                  <div className="bar-chart-container">
+                    <div className="stacked-bar">
+                      <div 
+                        className="bar-segment uptime" 
+                        style={{ width: `${totalHours.uptimePercent}%` }}
+                      >
+                        Uptime: {totalHours.uptimePercent}%
+                      </div>
+                      <div 
+                        className="bar-segment downtime" 
+                        style={{ width: `${totalHours.downtimePercent}%` }}
+                      >
+                        Downtime: {totalHours.downtimePercent}%
+                      </div>
+                    </div>
+                    <div className="bar-legend">
+                      <div className="legend-item">
+                        <div className="color-box uptime"></div>
+                        <span>Uptime (Utilization + Idle): {formatHours(totalHours.utilizationHours + totalHours.idleHours)}</span>
+                      </div>
+                      <div className="legend-item">
+                        <div className="color-box downtime"></div>
+                        <span>Downtime (Maintenance + Broken): {formatHours(totalHours.maintenanceHours + totalHours.brokenHours)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </Col>
             </Row>
           </Card>
           
-          {/* Purpose Breakdown Section */}
-          <Card title="Purpose Breakdown" className="section-card">
-            <div className="purpose-breakdown-container">
-              <div className="purpose-bars">
-                <div className="purpose-bar">
-                  <Text strong>Utilization</Text>
-                  <Progress 
-                    percent={purposeBreakdown.utilizationPercent} 
-                    strokeColor="#1890ff"
-                    format={(percent) => `${percent}%`}
-                  />
-                  <Text>{purposeBreakdown.utilization} events</Text>
-                </div>
-                
-                <div className="purpose-bar">
-                  <Text strong>Maintenance</Text>
-                  <Progress 
-                    percent={purposeBreakdown.maintenancePercent} 
-                    strokeColor="#faad14"
-                    format={(percent) => `${percent}%`}
-                  />
-                  <Text>{purposeBreakdown.maintenance} events</Text>
-                </div>
-                
-                <div className="purpose-bar">
-                  <Text strong>Broken</Text>
-                  <Progress 
-                    percent={purposeBreakdown.brokenPercent} 
-                    strokeColor="#f5222d"
-                    format={(percent) => `${percent}%`}
-                  />
-                  <Text>{purposeBreakdown.broken} events</Text>
-                </div>
-              </div>
-              
-              <div className="downtime-stat">
-                <Card bordered={false}>
-                  <Statistic
-                    title="Downtime Ratio"
-                    value={metrics.downtimeRatio}
-                    suffix="%"
-                    valueStyle={{ color: metrics.downtimeRatio > 25 ? '#f5222d' : '#3f8600' }}
-                  />
-                  <Text type="secondary">maintenance + broken events</Text>
-                </Card>
-              </div>
-            </div>
-          </Card>
-          
           {/* Equipment Utilization Table */}
-          <Card title="Equipment Utilization & Costs" className="section-card">
+          <Card 
+            title="Equipment Utilization Report" 
+            className="section-card"
+            extra={
+              <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportEquipmentCSV()}>
+                Export
+              </Button>
+            }
+          >
             <Table 
               dataSource={equipmentUtilization} 
               columns={equipmentColumns}
               rowKey="id"
-              pagination={{ pageSize: 5 }}
+              pagination={{ pageSize: 10 }}
+              summary={pageData => {
+                let totalUtilizationHours = 0;
+                let totalMaintenanceHours = 0;
+                let totalBrokenHours = 0;
+                let totalIdleHours = 0;
+                
+                pageData.forEach(({ utilizationHours, maintenanceHours, brokenHours, idleHours }) => {
+                  totalUtilizationHours += utilizationHours || 0;
+                  totalMaintenanceHours += maintenanceHours || 0;
+                  totalBrokenHours += brokenHours || 0;
+                  totalIdleHours += idleHours || 0;
+                });
+                
+                // Calculate total uptime and downtime for the table
+                const totalHours = totalUtilizationHours + totalMaintenanceHours + totalBrokenHours + totalIdleHours;
+                const uptimePercent = totalHours > 0 
+                  ? Math.round(((totalUtilizationHours + totalIdleHours) / totalHours) * 100) 
+                  : 0;
+                const downtimePercent = totalHours > 0 
+                  ? Math.round(((totalMaintenanceHours + totalBrokenHours) / totalHours) * 100) 
+                  : 0;
+                
+                return (
+                  <>
+                    <Table.Summary.Row className="font-bold">
+                      <Table.Summary.Cell index={0}>Total</Table.Summary.Cell>
+                      <Table.Summary.Cell index={1}>{formatHours(totalUtilizationHours)}</Table.Summary.Cell>
+                      <Table.Summary.Cell index={2}>{formatHours(totalMaintenanceHours)}</Table.Summary.Cell>
+                      <Table.Summary.Cell index={3}>{formatHours(totalBrokenHours)}</Table.Summary.Cell>
+                      <Table.Summary.Cell index={4}>{formatHours(totalIdleHours)}</Table.Summary.Cell>
+                      <Table.Summary.Cell index={5}>{uptimePercent}%</Table.Summary.Cell>
+                      <Table.Summary.Cell index={6}>{downtimePercent}%</Table.Summary.Cell>
+                    </Table.Summary.Row>
+                  </>
+                );
+              }}
               locale={{
                 emptyText: (
                   <div style={{ padding: '20px 0' }}>
@@ -785,8 +1048,73 @@ function Analytics() {
             />
           </Card>
           
+          {/* Equipment Utilization Bar Chart */}
+          <Card 
+            title="Instrument Utilization Chart" 
+            className="section-card"
+          >
+            <div className="instrument-bar-chart">
+              {equipmentBarChartData.map((item, index) => (
+                <div key={index} className="equipment-bar-container">
+                  <div className="equipment-name">{item.name}</div>
+                  <div className="equipment-bar">
+                    <div 
+                      className="bar-segment utilization" 
+                      style={{ width: `${(item.utilization / (item.utilization + item.maintenance + item.broken + item.idle)) * 100}%` }}
+                      title={`Utilization: ${formatHours(item.utilization)}`}
+                    ></div>
+                    <div 
+                      className="bar-segment maintenance" 
+                      style={{ width: `${(item.maintenance / (item.utilization + item.maintenance + item.broken + item.idle)) * 100}%` }}
+                      title={`Maintenance: ${formatHours(item.maintenance)}`}
+                    ></div>
+                    <div 
+                      className="bar-segment broken" 
+                      style={{ width: `${(item.broken / (item.utilization + item.maintenance + item.broken + item.idle)) * 100}%` }}
+                      title={`Broken: ${formatHours(item.broken)}`}
+                    ></div>
+                    <div 
+                      className="bar-segment idle" 
+                      style={{ width: `${(item.idle / (item.utilization + item.maintenance + item.broken + item.idle)) * 100}%` }}
+                      title={`Idle: ${formatHours(item.idle)}`}
+                    ></div>
+                  </div>
+                  <div className="equipment-hours">
+                    {formatHours(item.utilization + item.maintenance + item.broken + item.idle)}
+                  </div>
+                </div>
+              ))}
+              <div className="bar-chart-legend">
+                <div className="legend-item">
+                  <div className="color-box utilization"></div>
+                  <span>Utilization</span>
+                </div>
+                <div className="legend-item">
+                  <div className="color-box maintenance"></div>
+                  <span>Maintenance</span>
+                </div>
+                <div className="legend-item">
+                  <div className="color-box broken"></div>
+                  <span>Broken</span>
+                </div>
+                <div className="legend-item">
+                  <div className="color-box idle"></div>
+                  <span>Idle</span>
+                </div>
+              </div>
+            </div>
+          </Card>
+          
           {/* Top Technicians Section */}
-          <Card title="Top Technicians" className="section-card">
+          <Card 
+            title="Top Technicians" 
+            className="section-card"
+            extra={
+              <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportTechnicianCSV()}>
+                Export
+              </Button>
+            }
+          >
             <Table 
               dataSource={topTechnicians} 
               columns={technicianColumns}
@@ -803,7 +1131,15 @@ function Analytics() {
           </Card>
           
           {/* Monthly Trends Section */}
-          <Card title="Monthly Trends" className="section-card">
+          <Card 
+            title="Monthly Trends" 
+            className="section-card"
+            extra={
+              <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportMonthlyCSV()}>
+                Export
+              </Button>
+            }
+          >
             <Table 
               dataSource={monthlyEventCounts} 
               columns={monthlyColumns}
@@ -813,7 +1149,15 @@ function Analytics() {
           </Card>
           
           {/* Recent Reservations Section */}
-          <Card title="Recent Reservations" className="section-card">
+          <Card 
+            title="Recent Reservations" 
+            className="section-card"
+            extra={
+              <Button icon={<FileExcelOutlined />} size="small" onClick={() => exportEventsCSV()}>
+                Export
+              </Button>
+            }
+          >
             <Table 
               dataSource={getFilteredEvents().slice(0, 10)} 
               columns={recentEventsColumns}
