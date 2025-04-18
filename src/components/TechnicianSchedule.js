@@ -1,7 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  Card, Select, Button, Typography, Spin, Alert, 
+  Avatar, Timeline, Tag, Empty, Space, Divider
+} from 'antd';
+import { 
+  CalendarOutlined, EnvironmentOutlined, ExperimentOutlined,
+  UserOutlined, ClockCircleOutlined, TagOutlined
+} from '@ant-design/icons';
 import { fetchTenant } from '../services/apiClient';
 import './ResourceViews.css';
+
+const { Option } = Select;
+const { Title, Text } = Typography;
 
 function TechnicianSchedule() {
   const { tenantId } = useParams();
@@ -180,104 +191,213 @@ function TechnicianSchedule() {
     }
   };
 
+  // Get purpose tag
+  const getPurposeTag = (purpose) => {
+    if (!purpose) return null;
+    
+    switch (purpose.toLowerCase()) {
+      case 'utilization':
+        return <Tag color="blue">Utilization</Tag>;
+      case 'maintenance':
+        return <Tag color="gold">Maintenance</Tag>;
+      case 'broken':
+        return <Tag color="red">Broken</Tag>;
+      default:
+        return <Tag>{purpose}</Tag>;
+    }
+  };
+
   // Get events for selected technician
   const filteredEvents = getTechnicianEvents(selectedTechnician);
 
+  // Get color dot for timeline based on event purpose
+  const getTimelineColor = (purpose) => {
+    if (!purpose) return 'blue'; // default
+    
+    switch (purpose.toLowerCase()) {
+      case 'utilization':
+        return 'blue';
+      case 'maintenance':
+        return 'gold';
+      case 'broken':
+        return 'red';
+      default:
+        return 'blue';
+    }
+  };
+
   return (
     <div className="dashboard-container">
-      <div className="content-header">
-        <h1>{getDisplayName()} - Technician Schedule</h1>
-        <div className="header-actions">
-          <button 
-            className="btn btn-outline-primary"
-            onClick={() => navigate(`/${tenantId}`)}
-          >
-            <i className="fas fa-calendar-alt me-1"></i>
-            Calendar View
-          </button>
+      <Card className="header-card">
+        <div className="header-content">
+          <Title level={3}>{getDisplayName()} - Technician Schedule</Title>
+          <div className="header-actions">
+            <Button 
+              type="primary"
+              icon={<CalendarOutlined />}
+              onClick={() => navigate(`/${tenantId}`)}
+            >
+              Calendar View
+            </Button>
+          </div>
         </div>
-      </div>
+      </Card>
       
       {loading ? (
-        <div className="loading-container">
-          <div>Loading technician data...</div>
-        </div>
-      ) : error ? (
-        <div className="error-message">
-          <h3>Error</h3>
-          <p>{error}</p>
-          <button className="btn btn-primary mt-3" onClick={() => navigate('/')}>
-            Return to Main Dashboard
-          </button>
-        </div>
-      ) : (
-        <div className="technician-schedule">
-          <div className="technician-header">
-            <div className="technician-selector">
-              <label className="filter-label">Select Technician</label>
-              <select 
-                className="filter-select"
-                value={selectedTechnician}
-                onChange={(e) => setSelectedTechnician(e.target.value)}
-              >
-                <option value="all">All Technicians</option>
-                {technicians.map((tech, index) => (
-                  <option key={index} value={tech}>{tech}</option>
-                ))}
-              </select>
-            </div>
+        <Card>
+          <div className="loading-container">
+            <Spin size="large" tip="Loading technician data..." />
           </div>
+        </Card>
+      ) : error ? (
+        <Card>
+          <Alert
+            message="Error Loading Technician Data"
+            description={error}
+            type="error"
+            showIcon
+            action={
+              <Button onClick={() => navigate('/')} type="primary">
+                Return to Main Dashboard
+              </Button>
+            }
+          />
+        </Card>
+      ) : (
+        <>
+          <Card>
+            <div className="technician-selector">
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Text strong>Select Technician</Text>
+                <Select 
+                  value={selectedTechnician}
+                  onChange={(value) => setSelectedTechnician(value)}
+                  style={{ width: 250 }}
+                >
+                  <Option value="all">All Technicians</Option>
+                  {technicians.map((tech, index) => (
+                    <Option key={index} value={tech}>{tech}</Option>
+                  ))}
+                </Select>
+              </Space>
+            </div>
+          </Card>
           
           {selectedTechnician !== 'all' && (
-            <div className="technician-card">
-              <div className="technician-avatar">
-                {getInitial(selectedTechnician)}
-              </div>
-              <div className="technician-info">
-                <div className="technician-name">{selectedTechnician}</div>
-                <div className="technician-role">Laboratory Technician</div>
-              </div>
-            </div>
-          )}
-          
-          <h2 className="section-title">Scheduled Assignments</h2>
-          
-          {technicians.length === 0 ? (
-            <div className="text-center py-4">
-              <i className="fas fa-user-slash fa-3x mb-3 text-muted"></i>
-              <p>No technicians found in any events. Try adding technician information to your calendar events.</p>
-            </div>
-          ) : filteredEvents.length === 0 ? (
-            <div className="text-center py-4">
-              <i className="fas fa-calendar-times fa-3x mb-3 text-muted"></i>
-              <p>No scheduled assignments found for {selectedTechnician === 'all' ? 'technicians' : selectedTechnician}</p>
-            </div>
-          ) : (
-            <div className="schedule-timeline">
-              {filteredEvents.map((event, index) => (
-                <div className="timeline-item" key={index}>
-                  <div className="timeline-content">
-                    <div className="timeline-time">{formatTimeRange(event.start, event.end)}</div>
-                    <div className="timeline-title">{event.title}</div>
-                    {selectedTechnician === 'all' && (
-                      <div className="timeline-technician">Technician: {event.technician}</div>
-                    )}
-                    {event.location && (
-                      <div className="timeline-location">
-                        <i className="fas fa-map-marker-alt me-1"></i> {event.location}
-                      </div>
-                    )}
-                    {event.equipment && (
-                      <div className="timeline-equipment">
-                        <i className="fas fa-microscope me-1"></i> {event.equipment}
-                      </div>
-                    )}
+            <Card>
+              <div className="technician-profile">
+                <Space size="large" align="center">
+                  <Avatar 
+                    size={64} 
+                    style={{ 
+                      backgroundColor: '#1890ff', 
+                      fontSize: '24px',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center'
+                    }}
+                  >
+                    {getInitial(selectedTechnician)}
+                  </Avatar>
+                  <div>
+                    <Title level={4} style={{ margin: 0 }}>{selectedTechnician}</Title>
+                    <Text type="secondary">Laboratory Technician</Text>
+                    <div style={{ marginTop: 8 }}>
+                      <Space>
+                        <Tag icon={<CalendarOutlined />} color="blue">
+                          {filteredEvents.length} Assignment{filteredEvents.length !== 1 ? 's' : ''}
+                        </Tag>
+                      </Space>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                </Space>
+              </div>
+            </Card>
           )}
-        </div>
+          
+          <Card 
+            title={
+              <Title level={4} style={{ margin: 0 }}>
+                Scheduled Assignments
+              </Title>
+            }
+            className="schedule-card"
+          >
+            {technicians.length === 0 ? (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="No technicians found in any events. Try adding technician information to your calendar events."
+              />
+            ) : filteredEvents.length === 0 ? (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={`No scheduled assignments found for ${selectedTechnician === 'all' ? 'technicians' : selectedTechnician}`}
+              />
+            ) : (
+              <Timeline mode="left">
+                {filteredEvents.map((event, index) => (
+                  <Timeline.Item 
+                    key={index} 
+                    color={getTimelineColor(event.purpose)}
+                    label={
+                      <div className="timeline-date">
+                        <div>{new Date(event.start).toLocaleDateString()}</div>
+                        <div>{formatTimeRange(event.start, event.end)}</div>
+                      </div>
+                    }
+                  >
+                    <Card 
+                      className="timeline-event-card"
+                      size="small"
+                      title={
+                        <Space>
+                          <span>{event.title}</span>
+                          {getPurposeTag(event.purpose)}
+                        </Space>
+                      }
+                      style={{ 
+                        borderLeft: `3px solid ${
+                          event.purpose === 'Maintenance' ? '#faad14' : 
+                          event.purpose === 'Broken' ? '#f5222d' : 
+                          '#1890ff'
+                        }` 
+                      }}
+                    >
+                      <Space direction="vertical" size={2} style={{ width: '100%' }}>
+                        {selectedTechnician === 'all' && (
+                          <div>
+                            <UserOutlined style={{ marginRight: 8 }} />
+                            <Text strong>{event.technician}</Text>
+                          </div>
+                        )}
+                        
+                        {event.equipment && (
+                          <div>
+                            <ExperimentOutlined style={{ marginRight: 8 }} />
+                            <Text>{event.equipment}</Text>
+                          </div>
+                        )}
+                        
+                        {event.location && (
+                          <div>
+                            <EnvironmentOutlined style={{ marginRight: 8 }} />
+                            <Text>{event.location}</Text>
+                          </div>
+                        )}
+                        
+                        {event.notes && (
+                          <div className="event-notes">
+                            <Text type="secondary">{event.notes}</Text>
+                          </div>
+                        )}
+                      </Space>
+                    </Card>
+                  </Timeline.Item>
+                ))}
+              </Timeline>
+            )}
+          </Card>
+        </>
       )}
     </div>
   );
