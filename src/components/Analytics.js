@@ -141,7 +141,12 @@ function Analytics() {
         name: resource.title,
         id: resource.id,
         count: 0,
-        utilization: 0
+        utilization: 0,
+        totalCost: 0,
+        avgCost: 0,
+        utilizationCount: 0,
+        maintenanceCount: 0,
+        brokenCount: 0
       }));
     }
     
@@ -151,16 +156,97 @@ function Analytics() {
         event.equipment === resource.title
       );
       
+      // Calculate purpose counts
+      const utilizationEvents = resourceEvents.filter(e => (e.purpose || 'Utilization') === 'Utilization');
+      const maintenanceEvents = resourceEvents.filter(e => e.purpose === 'Maintenance');
+      const brokenEvents = resourceEvents.filter(e => e.purpose === 'Broken');
+      
+      // Calculate cost metrics
+      const totalCost = resourceEvents.reduce((sum, event) => sum + (Number(event.cost) || 0), 0);
+      const avgCost = resourceEvents.length > 0 ? totalCost / resourceEvents.length : 0;
+      
       return {
         name: resource.title || 'Unknown Equipment',
         id: resource.id,
         count: resourceEvents.length,
         utilization: filteredEvents.length > 0 ? 
-          Math.round((resourceEvents.length / filteredEvents.length) * 100) : 0
+          Math.round((resourceEvents.length / filteredEvents.length) * 100) : 0,
+        totalCost: totalCost,
+        avgCost: avgCost,
+        utilizationCount: utilizationEvents.length,
+        maintenanceCount: maintenanceEvents.length,
+        brokenCount: brokenEvents.length
       };
     }).sort((a, b) => b.count - a.count);
     
     return utilization;
+  };
+
+  // Calculate purpose breakdown for all events
+  const calculatePurposeBreakdown = () => {
+    const filteredEvents = getFilteredEvents();
+    
+    if (filteredEvents.length === 0) {
+      return {
+        utilization: 0,
+        maintenance: 0,
+        broken: 0,
+        total: 0
+      };
+    }
+    
+    const counts = {
+      utilization: filteredEvents.filter(e => (e.purpose || 'Utilization') === 'Utilization').length,
+      maintenance: filteredEvents.filter(e => e.purpose === 'Maintenance').length,
+      broken: filteredEvents.filter(e => e.purpose === 'Broken').length,
+      total: filteredEvents.length
+    };
+    
+    return {
+      ...counts,
+      utilizationPercent: Math.round((counts.utilization / counts.total) * 100),
+      maintenancePercent: Math.round((counts.maintenance / counts.total) * 100),
+      brokenPercent: Math.round((counts.broken / counts.total) * 100)
+    };
+  };
+
+  // Calculate total and average costs
+  const calculateCostMetrics = () => {
+    const filteredEvents = getFilteredEvents();
+    
+    if (filteredEvents.length === 0) {
+      return {
+        totalCost: 0,
+        avgCost: 0,
+        utilizationCost: 0,
+        maintenanceCost: 0,
+        brokenCost: 0
+      };
+    }
+    
+    // Calculate total costs
+    const totalCost = filteredEvents.reduce((sum, event) => sum + (Number(event.cost) || 0), 0);
+    
+    // Calculate costs by purpose
+    const utilizationCost = filteredEvents
+      .filter(e => (e.purpose || 'Utilization') === 'Utilization')
+      .reduce((sum, event) => sum + (Number(event.cost) || 0), 0);
+      
+    const maintenanceCost = filteredEvents
+      .filter(e => e.purpose === 'Maintenance')
+      .reduce((sum, event) => sum + (Number(event.cost) || 0), 0);
+      
+    const brokenCost = filteredEvents
+      .filter(e => e.purpose === 'Broken')
+      .reduce((sum, event) => sum + (Number(event.cost) || 0), 0);
+    
+    return {
+      totalCost,
+      avgCost: filteredEvents.length > 0 ? Math.round(totalCost / filteredEvents.length) : 0,
+      utilizationCost,
+      maintenanceCost,
+      brokenCost
+    };
   };
 
   // Get top technicians by number of events
@@ -172,19 +258,28 @@ function Analytics() {
     }
     
     const technicianCounts = {};
+    const technicianCosts = {};
     
     filteredEvents.forEach(event => {
       if (event.technician) {
+        // Count events
         if (technicianCounts[event.technician]) {
           technicianCounts[event.technician]++;
+          technicianCosts[event.technician] += (Number(event.cost) || 0);
         } else {
           technicianCounts[event.technician] = 1;
+          technicianCosts[event.technician] = (Number(event.cost) || 0);
         }
       }
     });
     
     return Object.entries(technicianCounts)
-      .map(([name, count]) => ({ name, count }))
+      .map(([name, count]) => ({ 
+        name, 
+        count,
+        totalCost: technicianCosts[name],
+        avgCost: Math.round(technicianCosts[name] / count)
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
   };
@@ -202,7 +297,8 @@ function Analytics() {
         name: monthDate.toLocaleString('default', { month: 'short' }),
         year: monthDate.getFullYear(),
         month: monthDate.getMonth(),
-        count: 0
+        count: 0,
+        cost: 0
       });
     }
     
@@ -217,6 +313,7 @@ function Analytics() {
           
           if (monthIndex >= 0) {
             months[monthIndex].count++;
+            months[monthIndex].cost += (Number(event.cost) || 0);
           }
         } catch (e) {
           console.error('Error processing event date:', e, event);
@@ -241,10 +338,18 @@ function Analytics() {
       ? Math.round((totalEvents / (resources.length * days)) * 100) 
       : 0;
     
+    // Calculate downtime ratio (maintenance + broken / total events)
+    const maintenanceEvents = filteredEvents.filter(e => e.purpose === 'Maintenance').length;
+    const brokenEvents = filteredEvents.filter(e => e.purpose === 'Broken').length;
+    const downtimeRatio = totalEvents > 0 
+      ? Math.round(((maintenanceEvents + brokenEvents) / totalEvents) * 100) 
+      : 0;
+    
     return {
       totalEvents,
       eventsPerDay,
-      utilizationRate
+      utilizationRate,
+      downtimeRatio
     };
   };
 
@@ -270,10 +375,22 @@ function Analytics() {
     }
   };
 
+  // Format currency for display
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
   const metrics = calculateMetrics();
   const equipmentUtilization = calculateEquipmentUtilization();
   const topTechnicians = getTopTechnicians();
   const monthlyEventCounts = getMonthlyEventCounts();
+  const purposeBreakdown = calculatePurposeBreakdown();
+  const costMetrics = calculateCostMetrics();
 
   return (
     <div className="dashboard-container">
@@ -346,14 +463,93 @@ function Analytics() {
             </div>
           </div>
           
+          {/* New Cost Summary Section */}
           <div className="report-section">
-            <h2 className="section-title">Equipment Utilization</h2>
+            <h2 className="section-title">Cost Summary</h2>
+            <div className="stat-cards">
+              <div className="stat-card">
+                <div className="stat-title">Total Cost</div>
+                <div className="stat-value">{formatCurrency(costMetrics.totalCost)}</div>
+                <div className="stat-sub">all events</div>
+              </div>
+              
+              <div className="stat-card">
+                <div className="stat-title">Average Cost</div>
+                <div className="stat-value">{formatCurrency(costMetrics.avgCost)}</div>
+                <div className="stat-sub">per event</div>
+              </div>
+              
+              <div className="stat-card">
+                <div className="stat-title">Utilization Cost</div>
+                <div className="stat-value">{formatCurrency(costMetrics.utilizationCost)}</div>
+                <div className="stat-sub">{purposeBreakdown.utilization} events</div>
+              </div>
+              
+              <div className="stat-card">
+                <div className="stat-title">Maintenance Cost</div>
+                <div className="stat-value">{formatCurrency(costMetrics.maintenanceCost)}</div>
+                <div className="stat-sub">{purposeBreakdown.maintenance} events</div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Purpose Breakdown Section */}
+          <div className="report-section">
+            <h2 className="section-title">Purpose Breakdown</h2>
+            <div className="purpose-breakdown">
+              <div className="breakdown-bars">
+                <div className="breakdown-bar">
+                  <div className="bar-label">Utilization</div>
+                  <div className="bar-container">
+                    <div className="bar-fill utilization" style={{ width: `${purposeBreakdown.utilizationPercent}%` }}>
+                      {purposeBreakdown.utilizationPercent}%
+                    </div>
+                  </div>
+                  <div className="bar-count">{purposeBreakdown.utilization} events</div>
+                </div>
+                
+                <div className="breakdown-bar">
+                  <div className="bar-label">Maintenance</div>
+                  <div className="bar-container">
+                    <div className="bar-fill maintenance" style={{ width: `${purposeBreakdown.maintenancePercent}%` }}>
+                      {purposeBreakdown.maintenancePercent}%
+                    </div>
+                  </div>
+                  <div className="bar-count">{purposeBreakdown.maintenance} events</div>
+                </div>
+                
+                <div className="breakdown-bar">
+                  <div className="bar-label">Broken</div>
+                  <div className="bar-container">
+                    <div className="bar-fill broken" style={{ width: `${purposeBreakdown.brokenPercent}%` }}>
+                      {purposeBreakdown.brokenPercent}%
+                    </div>
+                  </div>
+                  <div className="bar-count">{purposeBreakdown.broken} events</div>
+                </div>
+              </div>
+              
+              <div className="breakdown-stats">
+                <div className="breakdown-stat">
+                  <div className="stat-title">Downtime Ratio</div>
+                  <div className="stat-value">{metrics.downtimeRatio}%</div>
+                  <div className="stat-sub">maintenance + broken events</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="report-section">
+            <h2 className="section-title">Equipment Utilization & Costs</h2>
             <table className="report-table">
               <thead>
                 <tr>
                   <th>Equipment</th>
-                  <th>Reservations</th>
+                  <th>Total Events</th>
                   <th>Utilization %</th>
+                  <th>Total Cost</th>
+                  <th>Avg Cost/Event</th>
+                  <th>Purpose Breakdown</th>
                 </tr>
               </thead>
               <tbody>
@@ -362,17 +558,29 @@ function Analytics() {
                     <td>{equipment.name}</td>
                     <td>{equipment.count}</td>
                     <td>
-                      <div className="utilization-bar" style={{ width: '150px', display: 'inline-block', marginRight: '10px' }}>
+                      <div className="utilization-bar" style={{ width: '100px', display: 'inline-block', marginRight: '10px' }}>
                         <div className="utilization-fill" style={{ width: `${equipment.utilization}%` }}></div>
                       </div>
                       {equipment.utilization}%
+                    </td>
+                    <td>{formatCurrency(equipment.totalCost)}</td>
+                    <td>{formatCurrency(equipment.avgCost)}</td>
+                    <td>
+                      <div className="purpose-mini-chart">
+                        <div className="mini-bar utilization" style={{ width: `${equipment.count ? (equipment.utilizationCount / equipment.count) * 100 : 0}%` }}></div>
+                        <div className="mini-bar maintenance" style={{ width: `${equipment.count ? (equipment.maintenanceCount / equipment.count) * 100 : 0}%` }}></div>
+                        <div className="mini-bar broken" style={{ width: `${equipment.count ? (equipment.brokenCount / equipment.count) * 100 : 0}%` }}></div>
+                      </div>
+                      <div className="purpose-mini-legend">
+                        U: {equipment.utilizationCount} | M: {equipment.maintenanceCount} | B: {equipment.brokenCount}
+                      </div>
                     </td>
                   </tr>
                 ))}
                 
                 {equipmentUtilization.length === 0 && (
                   <tr>
-                    <td colSpan="3" className="text-center py-4">
+                    <td colSpan="6" className="text-center py-4">
                       <i className="fas fa-info-circle me-2"></i>
                       No equipment utilization data available
                     </td>
@@ -390,6 +598,8 @@ function Analytics() {
                   <tr>
                     <th>Technician</th>
                     <th>Reservations</th>
+                    <th>Total Cost</th>
+                    <th>Avg Cost/Event</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -397,6 +607,8 @@ function Analytics() {
                     <tr key={index}>
                       <td>{technician.name}</td>
                       <td>{technician.count}</td>
+                      <td>{formatCurrency(technician.totalCost)}</td>
+                      <td>{formatCurrency(technician.avgCost)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -416,7 +628,8 @@ function Analytics() {
                 <tr>
                   <th>Month</th>
                   <th>Reservations</th>
-                  <th>Trend</th>
+                  <th>Total Cost</th>
+                  <th>Activity Trend</th>
                 </tr>
               </thead>
               <tbody>
@@ -424,6 +637,7 @@ function Analytics() {
                   <tr key={index}>
                     <td>{month.name} {month.year}</td>
                     <td>{month.count}</td>
+                    <td>{formatCurrency(month.cost)}</td>
                     <td>
                       <div className="utilization-bar" style={{ width: '150px', display: 'inline-block' }}>
                         <div 
@@ -449,7 +663,8 @@ function Analytics() {
                   <th>Date</th>
                   <th>Title</th>
                   <th>Equipment</th>
-                  <th>Technician</th>
+                  <th>Purpose</th>
+                  <th>Cost</th>
                 </tr>
               </thead>
               <tbody>
@@ -458,13 +673,18 @@ function Analytics() {
                     <td>{new Date(event.start).toLocaleDateString()}</td>
                     <td>{event.title}</td>
                     <td>{event.equipment || resources.find(r => r.id === event.resourceId)?.title || 'Unknown'}</td>
-                    <td>{event.technician || 'N/A'}</td>
+                    <td>
+                      <span className={`purpose-badge ${(event.purpose || 'Utilization').toLowerCase()}`}>
+                        {event.purpose || 'Utilization'}
+                      </span>
+                    </td>
+                    <td>{formatCurrency(event.cost || 0)}</td>
                   </tr>
                 ))}
                 
                 {getFilteredEvents().length === 0 && (
                   <tr>
-                    <td colSpan="4" className="text-center py-4">
+                    <td colSpan="5" className="text-center py-4">
                       <i className="fas fa-calendar-times me-2"></i>
                       No reservations found in the selected time period
                     </td>
