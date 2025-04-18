@@ -43,6 +43,19 @@ const ensureISODateFormat = (events) => {
   });
 };
 
+// Helper to get purpose-based CSS class for events
+const getPurposeClass = (purpose) => {
+  switch(purpose?.toLowerCase()) {
+    case 'maintenance':
+      return 'event-maintenance';
+    case 'broken':
+      return 'event-broken';
+    case 'utilization':
+    default:
+      return 'event-utilization';
+  }
+};
+
 function TenantCalendar() {
   const { tenantId } = useParams();
   const navigate = useNavigate();
@@ -56,10 +69,11 @@ function TenantCalendar() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [showWeekends, setShowWeekends] = useState(true);
   
-  // New filter states
+  // Filter states
   const [equipmentFilter, setEquipmentFilter] = useState('all');
   const [technicianFilter, setTechnicianFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [purposeFilter, setPurposeFilter] = useState('all'); // New filter for purpose
   
   // Track unique values for filters
   const [uniqueEquipment, setUniqueEquipment] = useState([]);
@@ -85,15 +99,33 @@ function TenantCalendar() {
         const savedDemoData = localStorage.getItem('demo-tenant-events');
         if (savedDemoData) {
           const parsedEvents = JSON.parse(savedDemoData);
-          setEvents(parsedEvents);
-          updateFilterOptions(parsedEvents);
-          applyFilters(parsedEvents);
+          // Add sample purpose and cost data if not present
+          const enhancedEvents = parsedEvents.map(event => ({
+            ...event,
+            purpose: event.purpose || ['Utilization', 'Maintenance', 'Broken'][Math.floor(Math.random() * 3)],
+            cost: event.cost || Math.floor(Math.random() * 1000)
+          }));
+          
+          setEvents(enhancedEvents);
+          updateFilterOptions(enhancedEvents);
+          applyFilters(enhancedEvents);
+          
+          // Save back the enhanced data
+          localStorage.setItem('demo-tenant-events', JSON.stringify(enhancedEvents));
         } else {
-          setEvents(demoTenantEvents);
-          updateFilterOptions(demoTenantEvents);
-          applyFilters(demoTenantEvents);
+          // Add purpose and cost to demo events
+          const enhancedDemoEvents = demoTenantEvents.map(event => ({
+            ...event,
+            purpose: ['Utilization', 'Maintenance', 'Broken'][Math.floor(Math.random() * 3)],
+            cost: Math.floor(Math.random() * 1000)
+          }));
+          
+          setEvents(enhancedDemoEvents);
+          updateFilterOptions(enhancedDemoEvents);
+          applyFilters(enhancedDemoEvents);
+          
           // Save initial demo data to localStorage
-          localStorage.setItem('demo-tenant-events', JSON.stringify(demoTenantEvents));
+          localStorage.setItem('demo-tenant-events', JSON.stringify(enhancedDemoEvents));
         }
         setResources(demoTenantResources);
         setTenantName('Demo Tenant');
@@ -187,6 +219,16 @@ function TenantCalendar() {
       });
     }
     
+    // Apply purpose filter (new)
+    if (purposeFilter !== 'all') {
+      filtered = filtered.filter(event => {
+        const purpose = event.purpose || 
+                       (event.extendedProps && event.extendedProps.purpose) || 
+                       'Utilization'; // Default if not specified
+        return purpose === purposeFilter;
+      });
+    }
+    
     // Apply status filter - based on date
     if (statusFilter !== 'all') {
       const now = new Date();
@@ -227,11 +269,16 @@ function TenantCalendar() {
     setStatusFilter(e.target.value);
   };
   
+  const handlePurposeFilterChange = (e) => {
+    setPurposeFilter(e.target.value);
+  };
+  
   // Reset all filters
   const resetFilters = () => {
     setEquipmentFilter('all');
     setTechnicianFilter('all');
     setStatusFilter('all');
+    setPurposeFilter('all');
   };
 
   // Initial data load and auth check
@@ -268,7 +315,7 @@ function TenantCalendar() {
   // Update filtered events when filters or events change
   useEffect(() => {
     applyFilters(events);
-  }, [equipmentFilter, technicianFilter, statusFilter, events]);
+  }, [equipmentFilter, technicianFilter, statusFilter, purposeFilter, events]);
 
   const handleDateSelect = async (selectInfo) => {
     const title = prompt('Please enter a new event title:');
@@ -285,7 +332,9 @@ function TenantCalendar() {
         start: selectInfo.startStr,
         end: selectInfo.endStr,
         allDay: selectInfo.allDay,
-        resourceId: resources.length > 0 ? resources[0].id : undefined
+        resourceId: resources.length > 0 ? resources[0].id : undefined,
+        purpose: 'Utilization', // Default purpose for new events
+        cost: 0 // Default cost for new events
       };
       
       // For demo tenant, handle with localStorage
@@ -354,6 +403,10 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
     checkAndAddProp('sampleType', 'Sample Type');
     checkAndAddProp('notes', 'Notes');
     checkAndAddProp('recordId', 'Record ID');
+    
+    // Add new properties
+    checkAndAddProp('purpose', 'Purpose');
+    checkAndAddProp('cost', 'Cost');
     
     // Check if there's an event link and handle it
     const eventLink = event.extendedProps?.eventLink || event.eventLink;
@@ -476,7 +529,7 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
         </div>
       </div>
 
-      {/* New Filter Controls */}
+      {/* Filter Controls */}
       {!loading && !error && (
         <div className="calendar-filters">
           <div className="filter-row">
@@ -511,6 +564,21 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
             </div>
             
             <div className="filter-group">
+              <label htmlFor="purposeFilter">Purpose:</label>
+              <select 
+                id="purposeFilter" 
+                value={purposeFilter} 
+                onChange={handlePurposeFilterChange}
+                className="filter-select"
+              >
+                <option value="all">All Purposes</option>
+                <option value="Utilization">Utilization</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Broken">Broken</option>
+              </select>
+            </div>
+            
+            <div className="filter-group">
               <label htmlFor="statusFilter">Status:</label>
               <select 
                 id="statusFilter" 
@@ -524,24 +592,24 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
                 <option value="completed">Completed</option>
               </select>
             </div>
+          </div>
+          
+          <div className="filter-actions">
+            <button 
+              className="btn btn-sm btn-outline-secondary"
+              onClick={resetFilters}
+            >
+              <i className="fas fa-undo me-1"></i>
+              Reset Filters
+            </button>
             
-            <div className="filter-actions">
-              <button 
-                className="btn btn-sm btn-outline-secondary"
-                onClick={resetFilters}
-              >
-                <i className="fas fa-undo me-1"></i>
-                Reset Filters
-              </button>
-              
-              <button 
-                className={`btn btn-sm ${showWeekends ? 'btn-outline-primary' : 'btn-primary'}`}
-                onClick={toggleWeekends}
-              >
-                <i className="fas fa-calendar-week me-1"></i>
-                {showWeekends ? "Hide Weekends" : "Show Weekends"}
-              </button>
-            </div>
+            <button 
+              className={`btn btn-sm ${showWeekends ? 'btn-outline-primary' : 'btn-primary'}`}
+              onClick={toggleWeekends}
+            >
+              <i className="fas fa-calendar-week me-1"></i>
+              {showWeekends ? "Hide Weekends" : "Show Weekends"}
+            </button>
           </div>
           
           {/* Filter summary */}
@@ -549,6 +617,7 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
             Showing {filteredEvents.length} of {events.length} events
             {equipmentFilter !== 'all' && ` • Equipment: ${equipmentFilter}`}
             {technicianFilter !== 'all' && ` • Technician: ${technicianFilter}`}
+            {purposeFilter !== 'all' && ` • Purpose: ${purposeFilter}`}
             {statusFilter !== 'all' && ` • Status: ${statusFilter}`}
           </div>
         </div>
@@ -611,7 +680,8 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
               // List of properties that might be at top level or in extendedProps
               const propsToCheck = [
                 'location', 'equipment', 'technician', 'notes', 
-                'recordId', 'sampleType', 'reminders', 'eventLink'
+                'recordId', 'sampleType', 'reminders', 'eventLink',
+                'purpose', 'cost' // Add new fields
               ];
               
               // Ensure all properties are accessible in both places
@@ -629,6 +699,10 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
                   transformedEvent[prop] = transformedEvent.extendedProps[prop];
                 }
               });
+              
+              // Add purpose-based CSS class
+              const purpose = transformedEvent.purpose || transformedEvent.extendedProps.purpose || 'Utilization';
+              transformedEvent.className = getPurposeClass(purpose);
               
               return transformedEvent;
             }}
