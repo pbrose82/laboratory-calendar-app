@@ -6,7 +6,12 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { fetchTenant, processCalendarEvent } from '../services/apiClient';
 import { demoTenantEvents, demoTenantResources } from '../data/sample-events';
+import { Card, Select, Button, Tag, Spin, Space, Alert, Typography } from 'antd';
+import { CalendarOutlined, ReloadOutlined, CheckCircleOutlined, ExclamationOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import './TenantCalendar.css';
+
+const { Option } = Select;
+const { Title } = Typography;
 
 // Helper function defined outside of component to ensure ISO date format
 const ensureISODateFormat = (events) => {
@@ -43,6 +48,19 @@ const ensureISODateFormat = (events) => {
   });
 };
 
+// Helper to get purpose-based CSS class for events
+const getPurposeClass = (purpose) => {
+  switch(purpose?.toLowerCase()) {
+    case 'maintenance':
+      return 'event-maintenance';
+    case 'broken':
+      return 'event-broken';
+    case 'utilization':
+    default:
+      return 'event-utilization';
+  }
+};
+
 function TenantCalendar() {
   const { tenantId } = useParams();
   const navigate = useNavigate();
@@ -56,10 +74,11 @@ function TenantCalendar() {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [showWeekends, setShowWeekends] = useState(true);
   
-  // New filter states
+  // Filter states
   const [equipmentFilter, setEquipmentFilter] = useState('all');
   const [technicianFilter, setTechnicianFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [purposeFilter, setPurposeFilter] = useState('all'); // New filter for purpose
   
   // Track unique values for filters
   const [uniqueEquipment, setUniqueEquipment] = useState([]);
@@ -85,15 +104,33 @@ function TenantCalendar() {
         const savedDemoData = localStorage.getItem('demo-tenant-events');
         if (savedDemoData) {
           const parsedEvents = JSON.parse(savedDemoData);
-          setEvents(parsedEvents);
-          updateFilterOptions(parsedEvents);
-          applyFilters(parsedEvents);
+          // Add sample purpose and cost data if not present
+          const enhancedEvents = parsedEvents.map(event => ({
+            ...event,
+            purpose: event.purpose || ['Utilization', 'Maintenance', 'Broken'][Math.floor(Math.random() * 3)],
+            cost: event.cost || Math.floor(Math.random() * 1000)
+          }));
+          
+          setEvents(enhancedEvents);
+          updateFilterOptions(enhancedEvents);
+          applyFilters(enhancedEvents);
+          
+          // Save back the enhanced data
+          localStorage.setItem('demo-tenant-events', JSON.stringify(enhancedEvents));
         } else {
-          setEvents(demoTenantEvents);
-          updateFilterOptions(demoTenantEvents);
-          applyFilters(demoTenantEvents);
+          // Add purpose and cost to demo events
+          const enhancedDemoEvents = demoTenantEvents.map(event => ({
+            ...event,
+            purpose: ['Utilization', 'Maintenance', 'Broken'][Math.floor(Math.random() * 3)],
+            cost: Math.floor(Math.random() * 1000)
+          }));
+          
+          setEvents(enhancedDemoEvents);
+          updateFilterOptions(enhancedDemoEvents);
+          applyFilters(enhancedDemoEvents);
+          
           // Save initial demo data to localStorage
-          localStorage.setItem('demo-tenant-events', JSON.stringify(demoTenantEvents));
+          localStorage.setItem('demo-tenant-events', JSON.stringify(enhancedDemoEvents));
         }
         setResources(demoTenantResources);
         setTenantName('Demo Tenant');
@@ -187,6 +224,16 @@ function TenantCalendar() {
       });
     }
     
+    // Apply purpose filter (new)
+    if (purposeFilter !== 'all') {
+      filtered = filtered.filter(event => {
+        const purpose = event.purpose || 
+                       (event.extendedProps && event.extendedProps.purpose) || 
+                       'Utilization'; // Default if not specified
+        return purpose === purposeFilter;
+      });
+    }
+    
     // Apply status filter - based on date
     if (statusFilter !== 'all') {
       const now = new Date();
@@ -215,16 +262,20 @@ function TenantCalendar() {
   };
 
   // Handle filter changes
-  const handleEquipmentFilterChange = (e) => {
-    setEquipmentFilter(e.target.value);
+  const handleEquipmentFilterChange = (value) => {
+    setEquipmentFilter(value);
   };
   
-  const handleTechnicianFilterChange = (e) => {
-    setTechnicianFilter(e.target.value);
+  const handleTechnicianFilterChange = (value) => {
+    setTechnicianFilter(value);
   };
   
-  const handleStatusFilterChange = (e) => {
-    setStatusFilter(e.target.value);
+  const handleStatusFilterChange = (value) => {
+    setStatusFilter(value);
+  };
+  
+  const handlePurposeFilterChange = (value) => {
+    setPurposeFilter(value);
   };
   
   // Reset all filters
@@ -232,6 +283,7 @@ function TenantCalendar() {
     setEquipmentFilter('all');
     setTechnicianFilter('all');
     setStatusFilter('all');
+    setPurposeFilter('all');
   };
 
   // Initial data load and auth check
@@ -268,7 +320,7 @@ function TenantCalendar() {
   // Update filtered events when filters or events change
   useEffect(() => {
     applyFilters(events);
-  }, [equipmentFilter, technicianFilter, statusFilter, events]);
+  }, [equipmentFilter, technicianFilter, statusFilter, purposeFilter, events]);
 
   const handleDateSelect = async (selectInfo) => {
     const title = prompt('Please enter a new event title:');
@@ -285,7 +337,9 @@ function TenantCalendar() {
         start: selectInfo.startStr,
         end: selectInfo.endStr,
         allDay: selectInfo.allDay,
-        resourceId: resources.length > 0 ? resources[0].id : undefined
+        resourceId: resources.length > 0 ? resources[0].id : undefined,
+        purpose: 'Utilization', // Default purpose for new events
+        cost: 0 // Default cost for new events
       };
       
       // For demo tenant, handle with localStorage
@@ -354,6 +408,10 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
     checkAndAddProp('sampleType', 'Sample Type');
     checkAndAddProp('notes', 'Notes');
     checkAndAddProp('recordId', 'Record ID');
+    
+    // Add new properties
+    checkAndAddProp('purpose', 'Purpose');
+    checkAndAddProp('cost', 'Cost');
     
     // Check if there's an event link and handle it
     const eventLink = event.extendedProps?.eventLink || event.eventLink;
@@ -459,181 +517,242 @@ End: ${event.end ? event.end.toLocaleString() : 'N/A'}
   };
 
   return (
-    <div className="dashboard-container">
-      <div className="content-header">
-        <h1>{getDisplayName()}</h1>
-        <div className="header-actions">
-          {/* Admin button if authenticated */}
-          {isAdminAuthenticated && (
-            <button 
-              className="btn btn-outline-primary"
-              onClick={() => navigate('/admin')}
+    <div className="tenant-calendar-container">
+      {/* Header */}
+      <Card className="header-card">
+        <div className="header-content">
+          <Title level={3}>{getDisplayName()}</Title>
+          <div className="header-actions">
+            {isAdminAuthenticated && (
+              <Button
+                type="default"
+                onClick={() => navigate('/admin')}
+              >
+                Admin Panel
+              </Button>
+            )}
+            <Button
+              type="primary"
+              icon={<CalendarOutlined />}
+              onClick={() => navigate(`/${tenantId}/analytics`)}
             >
-              <i className="fas fa-cog me-1"></i>
-              Admin
-            </button>
-          )}
+              View Analytics
+            </Button>
+          </div>
         </div>
-      </div>
+      </Card>
 
-      {/* New Filter Controls */}
-      {!loading && !error && (
-        <div className="calendar-filters">
-          <div className="filter-row">
-            <div className="filter-group">
-              <label htmlFor="equipmentFilter">Equipment:</label>
-              <select 
-                id="equipmentFilter" 
-                value={equipmentFilter} 
-                onChange={handleEquipmentFilterChange}
-                className="filter-select"
-              >
-                <option value="all">All Equipment</option>
-                {uniqueEquipment.map(item => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="filter-group">
-              <label htmlFor="technicianFilter">Technician:</label>
-              <select 
-                id="technicianFilter" 
-                value={technicianFilter} 
-                onChange={handleTechnicianFilterChange}
-                className="filter-select"
-              >
-                <option value="all">All Technicians</option>
-                {uniqueTechnicians.map(item => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="filter-group">
-              <label htmlFor="statusFilter">Status:</label>
-              <select 
-                id="statusFilter" 
-                value={statusFilter} 
-                onChange={handleStatusFilterChange}
-                className="filter-select"
-              >
-                <option value="all">All Status</option>
-                <option value="upcoming">Upcoming</option>
-                <option value="ongoing">Ongoing</option>
-                <option value="completed">Completed</option>
-              </select>
-            </div>
-            
-            <div className="filter-actions">
-              <button 
-                className="btn btn-sm btn-outline-secondary"
-                onClick={resetFilters}
-              >
-                <i className="fas fa-undo me-1"></i>
-                Reset Filters
-              </button>
-              
-              <button 
-                className={`btn btn-sm ${showWeekends ? 'btn-outline-primary' : 'btn-primary'}`}
-                onClick={toggleWeekends}
-              >
-                <i className="fas fa-calendar-week me-1"></i>
-                {showWeekends ? "Hide Weekends" : "Show Weekends"}
-              </button>
-            </div>
-          </div>
-          
-          {/* Filter summary */}
-          <div className="filter-summary">
-            Showing {filteredEvents.length} of {events.length} events
-            {equipmentFilter !== 'all' && ` • Equipment: ${equipmentFilter}`}
-            {technicianFilter !== 'all' && ` • Technician: ${technicianFilter}`}
-            {statusFilter !== 'all' && ` • Status: ${statusFilter}`}
-          </div>
-        </div>
-      )}
-      
       {loading ? (
-        <div className="laboratory-calendar loading-container">
-          <div>Loading tenant calendar...</div>
-        </div>
-      ) : error ? (
-        <div className="laboratory-calendar">
-          <div className="error-message">
-            <h3>Error</h3>
-            <p>{error}</p>
-            <button className="btn btn-primary mt-3" onClick={() => navigate('/')}>
-              Return to Main Calendar
-            </button>
+        <Card>
+          <div className="loading-container">
+            <Spin size="large" tip="Loading calendar data..." />
           </div>
-        </div>
+        </Card>
+      ) : error ? (
+        <Card>
+          <Alert
+            message="Error Loading Calendar"
+            description={error}
+            type="error"
+            showIcon
+            action={
+              <Button onClick={() => navigate('/')} type="primary">
+                Return to Main Dashboard
+              </Button>
+            }
+          />
+        </Card>
       ) : (
-        <div className="laboratory-calendar">
-          <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="timeGridWeek"
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay'
-            }}
-            editable={true}
-            selectable={true}
-            selectMirror={true}
-            dayMaxEvents={true}
-            select={handleDateSelect}
-            eventClick={handleEventClick}
-            eventDrop={handleEventDrop}
-            eventRemove={handleEventRemove}
-            events={filteredEvents}
-            resources={resources}
-            height="auto"
-            slotMinTime="06:00:00" // Start calendar at 6am
-            allDaySlot={true}
-            allDayText="all-day"
-            weekends={showWeekends} // Control weekends visibility
-            
-            // Filter by resource if resourceId is provided in URL
-            resourceId={resourceFilter}
-            
-            // Add this eventDataTransform function to handle both top-level and nested properties
-            eventDataTransform={(event) => {
-              // For handling the transition from nested to top-level properties
-              // This ensures both formats work
-              const transformedEvent = { ...event };
+        <>
+          {/* Filter Panel */}
+          <Card className="filter-card">
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <div className="filter-row">
+                <div className="filter-item">
+                  <label>Equipment:</label>
+                  <Select
+                    value={equipmentFilter}
+                    onChange={handleEquipmentFilterChange}
+                    style={{ width: 200 }}
+                  >
+                    <Option value="all">All Equipment</Option>
+                    {uniqueEquipment.map(item => (
+                      <Option key={item} value={item}>{item}</Option>
+                    ))}
+                  </Select>
+                </div>
+                
+                <div className="filter-item">
+                  <label>Technician:</label>
+                  <Select
+                    value={technicianFilter}
+                    onChange={handleTechnicianFilterChange}
+                    style={{ width: 200 }}
+                  >
+                    <Option value="all">All Technicians</Option>
+                    {uniqueTechnicians.map(item => (
+                      <Option key={item} value={item}>{item}</Option>
+                    ))}
+                  </Select>
+                </div>
+                
+                <div className="filter-item">
+                  <label>Purpose:</label>
+                  <Select
+                    value={purposeFilter}
+                    onChange={handlePurposeFilterChange}
+                    style={{ width: 150 }}
+                  >
+                    <Option value="all">All Purposes</Option>
+                    <Option value="Utilization">Utilization</Option>
+                    <Option value="Maintenance">Maintenance</Option>
+                    <Option value="Broken">Broken</Option>
+                  </Select>
+                </div>
+                
+                <div className="filter-item">
+                  <label>Status:</label>
+                  <Select
+                    value={statusFilter}
+                    onChange={handleStatusFilterChange}
+                    style={{ width: 150 }}
+                  >
+                    <Option value="all">All Status</Option>
+                    <Option value="upcoming">Upcoming</Option>
+                    <Option value="ongoing">Ongoing</Option>
+                    <Option value="completed">Completed</Option>
+                  </Select>
+                </div>
+                
+                <div className="filter-actions">
+                  <Button 
+                    icon={<ReloadOutlined />} 
+                    onClick={resetFilters}
+                  >
+                    Reset Filters
+                  </Button>
+                  
+                  <Button 
+                    onClick={toggleWeekends}
+                  >
+                    {showWeekends ? "Hide Weekends" : "Show Weekends"}
+                  </Button>
+                </div>
+              </div>
               
-              // Initialize extendedProps if it doesn't exist
-              if (!transformedEvent.extendedProps) {
-                transformedEvent.extendedProps = {};
-              }
+              {/* Filter summary */}
+              {(equipmentFilter !== 'all' || technicianFilter !== 'all' || purposeFilter !== 'all' || statusFilter !== 'all') && (
+                <Alert
+                  message={
+                    <span>
+                      Showing {filteredEvents.length} of {events.length} events
+                      {equipmentFilter !== 'all' && <Tag className="filter-tag">Equipment: {equipmentFilter}</Tag>}
+                      {technicianFilter !== 'all' && <Tag className="filter-tag">Technician: {technicianFilter}</Tag>}
+                      {purposeFilter !== 'all' && <Tag className="filter-tag">Purpose: {purposeFilter}</Tag>}
+                      {statusFilter !== 'all' && <Tag className="filter-tag">Status: {statusFilter}</Tag>}
+                    </span>
+                  }
+                  type="info"
+                  showIcon
+                />
+              )}
               
-              // List of properties that might be at top level or in extendedProps
-              const propsToCheck = [
-                'location', 'equipment', 'technician', 'notes', 
-                'recordId', 'sampleType', 'reminders', 'eventLink'
-              ];
+              {/* Purpose Legend */}
+              <div className="purpose-legend">
+                <span>Event Types:</span>
+                <Tag color="blue" icon={<CheckCircleOutlined />}>Utilization</Tag>
+                <Tag color="gold" icon={<ExclamationOutlined />}>Maintenance</Tag>
+                <Tag color="red" icon={<CloseCircleOutlined />}>Broken</Tag>
+              </div>
+            </Space>
+          </Card>
+
+          {/* Calendar */}
+          <Card className="calendar-card">
+            <FullCalendar
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+              initialView="timeGridWeek"
+              headerToolbar={{
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+              }}
+              editable={true}
+              selectable={true}
+              selectMirror={true}
+              dayMaxEvents={true}
+              select={handleDateSelect}
+              eventClick={handleEventClick}
+              eventDrop={handleEventDrop}
+              eventRemove={handleEventRemove}
+              events={filteredEvents}
+              resources={resources}
+              height="auto"
+              slotMinTime="06:00:00" // Start calendar at 6am
+              allDaySlot={true}
+              allDayText="all-day"
+              weekends={showWeekends} // Control weekends visibility
               
-              // Ensure all properties are accessible in both places
-              // This allows the event handler to check both locations
-              propsToCheck.forEach(prop => {
-                // Move top-level props to extendedProps for backward compatibility
-                if (transformedEvent[prop] !== undefined && 
-                    transformedEvent.extendedProps[prop] === undefined) {
-                  transformedEvent.extendedProps[prop] = transformedEvent[prop];
+              // Filter by resource if resourceId is provided in URL
+              resourceId={resourceFilter}
+              
+              // Add this eventDataTransform function to handle both top-level and nested properties
+              eventDataTransform={(event) => {
+                // For handling the transition from nested to top-level properties
+                // This ensures both formats work
+                const transformedEvent = { ...event };
+                
+                // Initialize extendedProps if it doesn't exist
+                if (!transformedEvent.extendedProps) {
+                  transformedEvent.extendedProps = {};
                 }
                 
-                // Also copy from extendedProps to top level for forward compatibility
-                if (transformedEvent.extendedProps[prop] !== undefined && 
-                    transformedEvent[prop] === undefined) {
-                  transformedEvent[prop] = transformedEvent.extendedProps[prop];
-                }
-              });
+                // List of properties that might be at top level or in extendedProps
+                const propsToCheck = [
+                  'location', 'equipment', 'technician', 'notes', 
+                  'recordId', 'sampleType', 'reminders', 'eventLink',
+                  'purpose', 'cost' // Add new fields
+                ];
+                
+                // Ensure all properties are accessible in both places
+                // This allows the event handler to check both locations
+                propsToCheck.forEach(prop => {
+                  // Move top-level props to extendedProps for backward compatibility
+                  if (transformedEvent[prop] !== undefined && 
+                      transformedEvent.extendedProps[prop] === undefined) {
+                    transformedEvent.extendedProps[prop] = transformedEvent[prop];
+                  }
+                  
+                  // Also copy from extendedProps to top level for forward compatibility
+                  if (transformedEvent.extendedProps[prop] !== undefined && 
+                      transformedEvent[prop] === undefined) {
+                    transformedEvent[prop] = transformedEvent.extendedProps[prop];
+                  }
+                });
+                
+                // Add purpose-based CSS class
+                const purpose = transformedEvent.purpose || transformedEvent.extendedProps.purpose || 'Utilization';
+                transformedEvent.className = getPurposeClass(purpose);
+                
+                return transformedEvent;
+              }}
               
-              return transformedEvent;
-            }}
-          />
-        </div>
+              // Add cost badge to events
+              eventDidMount={(info) => {
+                if (info.event.extendedProps.cost) {
+                  const costValue = info.event.extendedProps.cost;
+                  const title = info.el.querySelector('.fc-event-title');
+                  if (title) {
+                    const costBadge = document.createElement('span');
+                    costBadge.className = 'cost-badge';
+                    costBadge.innerText = `$${costValue}`;
+                    title.appendChild(costBadge);
+                  }
+                }
+              }}
+            />
+          </Card>
+        </>
       )}
     </div>
   );

@@ -1,7 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  Card, Row, Col, Button, Spin, Alert, Progress, Statistic,
+  Divider, Badge, Tag, Typography, Space, Empty
+} from 'antd';
+import { 
+  CalendarOutlined, ToolOutlined, CheckCircleOutlined,
+  CloseCircleOutlined, ExclamationOutlined, DashboardOutlined,
+  BarChartOutlined, PlayCircleOutlined
+} from '@ant-design/icons';
 import { fetchTenant } from '../services/apiClient';
 import './ResourceViews.css';
+
+const { Title, Text } = Typography;
 
 function ResourceDashboard() {
   const { tenantId } = useParams();
@@ -34,17 +45,7 @@ function ResourceDashboard() {
         // Get resources from API 
         let resourcesList = [...(tenantData.resources || [])];
         
-        // Add example Extruder equipment with maintenance status if not present
-        if (!resourcesList.some(r => r.title === 'Extruder')) {
-          resourcesList.push({
-            id: 'extruder-123',
-            title: 'Extruder',
-            maintenanceStatus: 'due', 
-            lastMaintenance: '2024-12-15',
-            nextMaintenance: '2025-04-15',
-            maintenanceInterval: '90 days'
-          });
-        }
+        setResources(tenantData.resources || []);
         
         setResources(resourcesList);
         setEvents(tenantData.events || []);
@@ -116,17 +117,63 @@ function ResourceDashboard() {
       }
     });
     
+    // Calculate event counts by purpose
+    const utilizationEvents = resourceEvents.filter(event => 
+      (event.purpose || 'Utilization') === 'Utilization');
+    const maintenanceEvents = resourceEvents.filter(event => 
+      event.purpose === 'Maintenance');
+    const brokenEvents = resourceEvents.filter(event => 
+      event.purpose === 'Broken');
+    
     return {
       total: resourceEvents.length,
       thisWeek: eventsThisWeek.length,
       utilization: eventsThisWeek.length > 0 ? 
-        Math.round((eventsThisWeek.length / 5) * 100) : 0 // Assuming 5 workdays per week
+        Math.round((eventsThisWeek.length / 5) * 100) : 0, // Assuming 5 workdays per week
+      utilizationEvents: utilizationEvents.length,
+      maintenanceEvents: maintenanceEvents.length,
+      brokenEvents: brokenEvents.length,
+      totalCost: resourceEvents.reduce((sum, event) => sum + (Number(event.cost) || 0), 0)
     };
   };
 
   // Get current equipment status
   const getResourceStatus = (resourceId) => {
     const resource = resources.find(r => r.id === resourceId);
+    
+    // First check purpose from recent events
+    const recentEvents = events
+      .filter(event => 
+        event.resourceId === resourceId || 
+        event.equipment === resource?.title
+      )
+      .sort((a, b) => new Date(b.start) - new Date(a.start)); // Most recent first
+    
+    // If we have a recent "Broken" event, the equipment is broken
+    if (recentEvents.some(event => event.purpose === 'Broken')) {
+      return 'broken';
+    }
+    
+    // Check if there's an active maintenance event
+    const now = new Date();
+    const currentEvent = events.find(event => {
+      try {
+        const eventStart = new Date(event.start);
+        const eventEnd = new Date(event.end);
+        return (
+          (event.resourceId === resourceId || 
+           event.equipment === resource?.title) &&
+          eventStart <= now && eventEnd >= now && 
+          event.purpose === 'Maintenance'
+        );
+      } catch (e) {
+        return false;
+      }
+    });
+    
+    if (currentEvent) {
+      return 'maintenance';
+    }
     
     // Check if equipment is marked for maintenance
     if (resource?.maintenanceStatus === 'overdue') {
@@ -136,15 +183,13 @@ function ResourceDashboard() {
     }
     
     // Otherwise check if it's in use
-    const now = new Date();
-    
-    const currentEvent = events.find(event => {
+    const inUseEvent = events.find(event => {
       try {
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
         return (
           (event.resourceId === resourceId || 
-          event.equipment === resource?.title) &&
+           event.equipment === resource?.title) &&
           eventStart <= now && eventEnd >= now
         );
       } catch (e) {
@@ -152,10 +197,10 @@ function ResourceDashboard() {
       }
     });
     
-    return currentEvent ? 'in-use' : 'available';
+    return inUseEvent ? 'in-use' : 'available';
   };
 
-  // Format days remaining until maintenance
+  // Get days until maintenance
   const getDaysUntilMaintenance = (nextMaintenanceDate) => {
     if (!nextMaintenanceDate) return null;
     
@@ -189,169 +234,227 @@ function ResourceDashboard() {
     }
   };
 
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  // Get status badge
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'available':
+        return <Badge status="success" text="Available" />;
+      case 'in-use':
+        return <Badge status="processing" text="In Use" />;
+      case 'broken':
+        return <Badge status="error" text="Out of Service" />;
+      case 'maintenance':
+        return <Badge status="warning" text="Under Maintenance" />;
+      case 'maintenance-due':
+        return <Badge status="warning" text="Maintenance Due" />;
+      case 'maintenance-overdue':
+        return <Badge status="error" text="Maintenance Overdue" />;
+      default:
+        return <Badge status="default" text="Unknown" />;
+    }
+  };
+
+  // Get status icon
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'available':
+        return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
+      case 'in-use':
+        return <PlayCircleOutlined style={{ color: '#1890ff' }} />;
+      case 'broken':
+        return <CloseCircleOutlined style={{ color: '#f5222d' }} />;
+      case 'maintenance':
+      case 'maintenance-due':
+      case 'maintenance-overdue':
+        return <ToolOutlined style={{ color: '#faad14' }} />;
+      default:
+        return <ExclamationOutlined style={{ color: '#d9d9d9' }} />;
+    }
+  };
+
   return (
     <div className="dashboard-container">
-      <div className="content-header">
-        <h1>{getDisplayName()} - Resource Dashboard</h1>
-        <div className="header-actions">
-          <button 
-            className="btn btn-outline-primary"
-            onClick={() => navigate(`/${tenantId}`)}
-          >
-            <i className="fas fa-calendar-alt me-1"></i>
-            Calendar View
-          </button>
+      <Card className="header-card">
+        <div className="header-content">
+          <Title level={3}>{getDisplayName()} - Resource Dashboard</Title>
+          <div className="header-actions">
+            <Button 
+              type="primary"
+              icon={<CalendarOutlined />}
+              onClick={() => navigate(`/${tenantId}`)}
+            >
+              Calendar View
+            </Button>
+          </div>
         </div>
-      </div>
+      </Card>
       
       {loading ? (
-        <div className="loading-container">
-          <div>Loading resource data...</div>
-        </div>
+        <Card>
+          <div className="loading-container">
+            <Spin size="large" tip="Loading resource data..." />
+          </div>
+        </Card>
       ) : error ? (
-        <div className="error-message">
-          <h3>Error</h3>
-          <p>{error}</p>
-        </div>
+        <Card>
+          <Alert
+            message="Error Loading Dashboard"
+            description={error}
+            type="error"
+            showIcon
+            action={
+              <Button onClick={() => navigate('/')} type="primary">
+                Return to Main Dashboard
+              </Button>
+            }
+          />
+        </Card>
       ) : (
         <div className="resource-dashboard">
-          <div className="dashboard-summary">
-            <div className="summary-card">
-              <div className="summary-icon">
-                <i className="fas fa-microscope"></i>
-              </div>
-              <div className="summary-content">
-                <div className="summary-title">Total Equipment</div>
-                <div className="summary-value">{resources.length}</div>
-              </div>
-            </div>
-            
-            <div className="summary-card">
-              <div className="summary-icon">
-                <i className="fas fa-calendar-check"></i>
-              </div>
-              <div className="summary-content">
-                <div className="summary-title">Total Reservations</div>
-                <div className="summary-value">{events.length}</div>
-              </div>
-            </div>
-            
-            <div className="summary-card">
-              <div className="summary-icon">
-                <i className="fas fa-clock"></i>
-              </div>
-              <div className="summary-content">
-                <div className="summary-title">Available Now</div>
-                <div className="summary-value">
-                  {resources.filter(r => getResourceStatus(r.id) === 'available').length}
-                </div>
-              </div>
-            </div>
-            
-            <div className="summary-card">
-              <div className="summary-icon">
-                <i className="fas fa-tools"></i>
-              </div>
-              <div className="summary-content">
-                <div className="summary-title">Maintenance Required</div>
-                <div className="summary-value">
-                  {resources.filter(r => 
-                    getResourceStatus(r.id) === 'maintenance-due' || 
-                    getResourceStatus(r.id) === 'maintenance-overdue'
+          <Row gutter={16} className="stats-row">
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Total Equipment"
+                  value={resources.length}
+                  prefix={<DashboardOutlined />}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Total Reservations"
+                  value={events.length}
+                  prefix={<CalendarOutlined />}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Available Now"
+                  value={resources.filter(r => getResourceStatus(r.id) === 'available').length}
+                  prefix={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
+                  suffix={`/ ${resources.length}`}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card>
+                <Statistic
+                  title="Out of Service"
+                  value={resources.filter(r => 
+                    ['broken', 'maintenance', 'maintenance-due', 'maintenance-overdue']
+                      .includes(getResourceStatus(r.id))
                   ).length}
-                </div>
-              </div>
-            </div>
-          </div>
+                  prefix={<ExclamationOutlined style={{ color: '#f5222d' }} />}
+                  suffix={`/ ${resources.length}`}
+                />
+              </Card>
+            </Col>
+          </Row>
           
-          <h2 className="section-title">Equipment Status</h2>
-          {resources.length === 0 ? (
-            <div className="text-center py-4">
-              <i className="fas fa-microscope fa-3x mb-3 text-muted"></i>
-              <p>No equipment found. Equipment will appear here when added to calendar events.</p>
+          <Card title="Status Legend">
+            <div className="status-legend">
+              <Space size="large">
+                <Badge status="success" text="Available" />
+                <Badge status="processing" text="In Use" />
+                <Badge status="warning" text="Maintenance" />
+                <Badge status="error" text="Out of Service" />
+              </Space>
             </div>
-          ) : (
-            <div className="resource-grid">
-              {resources.map(resource => {
-                const utilization = calculateUtilization(resource.id);
-                const status = getResourceStatus(resource.id);
-                const daysUntilMaintenance = resource.nextMaintenance ? 
-                  getDaysUntilMaintenance(resource.nextMaintenance) : null;
-                
-                return (
-                  <div className="resource-card" key={resource.id}>
-                    <div className={`resource-status ${status}`}>
-                      {status === 'available' ? 'Available' : 
-                       status === 'in-use' ? 'In Use' :
-                       status === 'maintenance-due' ? 'Maintenance Due' :
-                       status === 'maintenance-overdue' ? 'Maintenance Overdue' : 
-                       'Unknown'}
-                    </div>
-                    <h3 className="resource-title">{resource.title}</h3>
-                    
-                    {/* Show maintenance info if available */}
-                    {resource.maintenanceInterval && (
-                      <div className="maintenance-info">
-                        <div className="maintenance-label">
-                          <i className="fas fa-tools me-1"></i>
-                          Maintenance Interval: {resource.maintenanceInterval}
+          </Card>
+          
+          <Card title="Equipment Status" className="equipment-status-card">
+            {resources.length === 0 ? (
+              <Empty
+                description="No equipment found. Equipment will appear here when added to calendar events."
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            ) : (
+              <Row gutter={[16, 16]}>
+                {resources.map(resource => {
+                  const utilization = calculateUtilization(resource.id);
+                  const status = getResourceStatus(resource.id);
+                  
+                  return (
+                    <Col xs={24} sm={12} md={8} lg={6} key={resource.id}>
+                      <Card 
+                        className={`resource-card status-${status}`}
+                        actions={[
+                          <Button 
+                            type="primary"
+                            icon={<CalendarOutlined />}
+                            onClick={() => handleViewEquipmentCalendar(resource.id)}
+                          >
+                            View Schedule
+                          </Button>
+                        ]}
+                      >
+                        <div className="resource-card-header">
+                          <Title level={4}>{resource.title}</Title>
+                          {getStatusBadge(status)}
                         </div>
                         
-                        {resource.lastMaintenance && (
-                          <div className="maintenance-detail">
-                            Last: {new Date(resource.lastMaintenance).toLocaleDateString()}
-                          </div>
-                        )}
+                        <Divider />
                         
-                        {resource.nextMaintenance && daysUntilMaintenance !== null && (
-                          <div className="maintenance-detail">
-                            Next: {new Date(resource.nextMaintenance).toLocaleDateString()}
-                            <span className={`maintenance-days ${daysUntilMaintenance <= 0 ? 'overdue' : 'upcoming'}`}>
-                              {daysUntilMaintenance <= 0 ? 
-                                `(${Math.abs(daysUntilMaintenance)} days overdue)` : 
-                                `(in ${daysUntilMaintenance} days)`}
-                            </span>
+                        <div className="resource-purpose-breakdown">
+                          <Text strong>Event Breakdown</Text>
+                          <div className="purpose-progress-container">
+                            <div className="purpose-progress">
+                              <div className="progress-segment utilization" 
+                                style={{width: `${utilization.total ? (utilization.utilizationEvents / utilization.total) * 100 : 0}%`}}>
+                              </div>
+                              <div className="progress-segment maintenance"
+                                style={{width: `${utilization.total ? (utilization.maintenanceEvents / utilization.total) * 100 : 0}%`}}>
+                              </div>
+                              <div className="progress-segment broken"
+                                style={{width: `${utilization.total ? (utilization.brokenEvents / utilization.total) * 100 : 0}%`}}>
+                              </div>
+                            </div>
+                            <div className="purpose-counts">
+                              <Tag color="blue">{utilization.utilizationEvents} Utilization</Tag>
+                              <Tag color="gold">{utilization.maintenanceEvents} Maintenance</Tag>
+                              <Tag color="red">{utilization.brokenEvents} Broken</Tag>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    <div className="resource-utilization">
-                      <div className="utilization-label">Weekly Utilization</div>
-                      <div className="utilization-bar">
-                        <div 
-                          className="utilization-fill" 
-                          style={{ width: `${utilization.utilization}%` }}
-                        ></div>
-                      </div>
-                      <div className="utilization-value">{utilization.utilization}%</div>
-                    </div>
-                    
-                    <div className="resource-stats">
-                      <div className="resource-stat">
-                        <div className="stat-label">Bookings (This Week)</div>
-                        <div className="stat-value">{utilization.thisWeek}</div>
-                      </div>
-                      <div className="resource-stat">
-                        <div className="stat-label">Total Bookings</div>
-                        <div className="stat-value">{utilization.total}</div>
-                      </div>
-                    </div>
-                    
-                    <div className="resource-actions">
-                      <button 
-                        className="resource-btn resource-btn-primary"
-                        onClick={() => handleViewEquipmentCalendar(resource.id)}
-                      >
-                        <i className="fas fa-calendar-alt"></i>
-                        View Schedule
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                        </div>
+                        
+                        <div className="resource-utilization">
+                          <Text strong>Weekly Utilization</Text>
+                          <Progress percent={utilization.utilization} />
+                        </div>
+                        
+                        <div className="resource-stats">
+                          <Statistic 
+                            title="Weekly Bookings" 
+                            value={utilization.thisWeek}
+                            valueStyle={{ fontSize: '20px' }}
+                          />
+                          <Statistic 
+                            title="Total Cost" 
+                            value={formatCurrency(utilization.totalCost)}
+                            valueStyle={{ fontSize: '20px' }}
+                          />
+                        </div>
+                      </Card>
+                    </Col>
+                  );
+                })}
+              </Row>
+            )}
+          </Card>
         </div>
       )}
     </div>

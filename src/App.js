@@ -10,6 +10,7 @@ import TechnicianSchedule from './components/TechnicianSchedule';
 import GanttChart from './components/GanttChart';
 import Analytics from './components/Analytics';
 import AppLayout from './components/AppLayout';
+import 'antd/dist/reset.css'
 import './App.css';
 
 // Protected route component

@@ -108,6 +108,12 @@ app.use(express.static(path.join(__dirname, 'build')));
  * - Supports ER number based updates
  * - Doesn't require action field
  */
+// This is a partial update to server.js to handle the new fields
+
+/**
+ * Enhanced API endpoint to handle multiple formats of calendar events
+ * - Now supports Purpose and Cost fields from Alchemy
+ */
 app.post('/api/calendar-events', (req, res) => {
   try {
     // Log the incoming request for debugging
@@ -141,7 +147,10 @@ app.post('/api/calendar-events', (req, res) => {
         recordId: body.recordId,
         sampleType: body.sampleType,
         reminders: body.reminders,
-        // Add the new eventLink field
+        // Add new fields from Alchemy
+        purpose: body.purpose || 'Utilization', // Default to Utilization if not provided
+        cost: body.cost || 0, // Default to 0 if not provided
+        // Add the eventLink field
         eventLink: body.eventLink || (body.recordId ? 
           `EquipmentReservation \nRecordID: ${body.recordId}\nLink to record: https://app.alchemy.cloud/${body.tenantId}/record/${body.recordId}` : 
           undefined)
@@ -170,63 +179,41 @@ app.post('/api/calendar-events', (req, res) => {
         // Continue with original format if conversion fails
       }
 
-      // Add this to the section where you process the hybrid format from Alchemy in server.js
-// This should be added right after the date conversion code but before creating the tenant
-
-// Extract and add any new equipment mentioned in events
-if (body.equipment && !tenants[tenantId]?.resources?.some(r => r.title === body.equipment)) {
-  // Generate a new unique ID for this equipment
-  const newEquipmentId = `equipment-${Date.now()}`;
-  
-  // Create tenant if needed
-  if (!tenants[tenantId]) {
-    console.log(`Creating new tenant: ${tenantId}`);
-    tenants[tenantId] = {
-      id: tenantId,
-      name: tenantId,
-      createdAt: new Date().toISOString(),
-      events: [],
-      resources: []
-    };
-  }
-  
-  // Initialize resources array if it doesn't exist
-  if (!tenants[tenantId].resources) {
-    tenants[tenantId].resources = [];
-  }
-  
-  // Add to resources array
-  tenants[tenantId].resources.push({
-    id: newEquipmentId,
-    title: body.equipment,
-    type: 'equipment'
-  });
-  
-  console.log(`Added new equipment "${body.equipment}" with ID "${newEquipmentId}"`);
-  
-  // Connect this event to the new resource
-  eventData.resourceId = newEquipmentId;
-}
-
-// Also add similar logic to the standard API format section - inside the 'create' case:
-
-// Extract and add any new equipment mentioned
-if (eventData.equipment && !tenants[tenantId].resources.some(r => r.title === eventData.equipment)) {
-  // Generate a new unique ID for this equipment
-  const newEquipmentId = `equipment-${Date.now()}`;
-  
-  // Add to resources array
-  tenants[tenantId].resources.push({
-    id: newEquipmentId,
-    title: eventData.equipment,
-    type: 'equipment'
-  });
-  
-  console.log(`Added new equipment "${eventData.equipment}" with ID "${newEquipmentId}"`);
-  
-  // Connect this event to the new resource
-  eventData.resourceId = newEquipmentId;
-}
+      // Extract and add any new equipment mentioned in events
+      if (body.equipment && !tenants[tenantId]?.resources?.some(r => r.title === body.equipment)) {
+        // Generate a new unique ID for this equipment
+        const newEquipmentId = `equipment-${Date.now()}`;
+        
+        // Create tenant if needed
+        if (!tenants[tenantId]) {
+          console.log(`Creating new tenant: ${tenantId}`);
+          tenants[tenantId] = {
+            id: tenantId,
+            name: tenantId,
+            createdAt: new Date().toISOString(),
+            events: [],
+            resources: []
+          };
+        }
+        
+        // Initialize resources array if it doesn't exist
+        if (!tenants[tenantId].resources) {
+          tenants[tenantId].resources = [];
+        }
+        
+        // Add to resources array
+        tenants[tenantId].resources.push({
+          id: newEquipmentId,
+          title: body.equipment,
+          type: 'equipment'
+        });
+        
+        console.log(`Added new equipment "${body.equipment}" with ID "${newEquipmentId}"`);
+        
+        // Connect this event to the new resource
+        eventData.resourceId = newEquipmentId;
+      }
+      
       // If equipment is specified, try to match it with a resource
       if (body.equipment) {
         // Find the matching resource based on equipment name
@@ -294,7 +281,7 @@ if (eventData.equipment && !tenants[tenantId].resources.some(r => r.title === ev
         data: eventData,
         message: isUpdate ? "Event updated from hybrid format" : "Event created from hybrid format"
       });
-    } 
+    }  
     // Check if this is the legacy Google Calendar format (has calendarId, summary)
     else if (body.calendarId && body.summary) {
       console.log('Received legacy Google Calendar format request');

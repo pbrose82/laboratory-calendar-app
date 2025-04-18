@@ -1,306 +1,212 @@
-/* TenantCalendar.css - Complete styles for the tenant calendar view */
+/* TenantCalendar.css - Simplified modern styling */
 
-/* Calendar container */
-.dashboard-container {
-  padding: 0;
-  width: 100%;
+/* Calendar Event Purpose-Based Styling */
+.event-utilization {
+  background-color: #4285F4 !important; /* Google blue */
+  border-color: #3367d6 !important;
 }
 
-/* Content header */
-.content-header {
+.event-maintenance {
+  background-color: #FBBC05 !important; /* Google yellow */
+  border-color: #f09705 !important;
+  color: #333 !important;
+}
+
+.event-broken {
+  background-color: #EA4335 !important; /* Google red */
+  border-color: #d62516 !important;
+}
+
+/* Hover effects for purpose-based events */
+.event-utilization:hover {
+  background-color: #3b78e7 !important;
+}
+
+.event-maintenance:hover {
+  background-color: #f5b301 !important;
+}
+
+.event-broken:hover {
+  background-color: #d7392c !important;
+}
+
+/* Cost badge - for displaying cost in calendar events */
+.fc-event .cost-badge {
+  font-size: 0.7em;
+  background: rgba(0,0,0,0.2);
+  border-radius: 3px;
+  padding: 1px 3px;
+  margin-left: 3px;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+/* Container styling for the entire calendar page */
+.tenant-calendar-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Header card styling */
+.header-card {
+  margin-bottom: 16px;
+}
+
+.header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
 }
 
-.content-header h1 {
-  font-size: 1.8rem;
-  font-weight: 500;
-  margin: 0;
-  color: #1565C0; /* Updated blue color */
-}
-
-/* Header actions container */
 .header-actions {
   display: flex;
   gap: 8px;
 }
 
-/* Button styling */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid transparent;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-  text-decoration: none;
-}
-
-.btn-sm {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.875rem;
-}
-
-.btn-primary {
-  color: #fff;
-  background-color: #1565C0; /* Updated blue color */
-  border-color: #1565C0;
-}
-
-.btn-primary:hover {
-  background-color: #0D47A1; /* Darker shade for hover state */
-  border-color: #0D47A1;
-}
-
-.btn-outline-primary {
-  color: #1565C0; /* Updated blue color */
-  background-color: transparent;
-  border-color: #1565C0;
-}
-
-.btn-outline-primary:hover {
-  color: #fff;
-  background-color: #1565C0;
-  border-color: #1565C0;
-}
-
-.btn-outline-secondary {
-  color: #6c757d;
-  background-color: transparent;
-  border-color: #6c757d;
-}
-
-.btn-outline-secondary:hover {
-  color: #fff;
-  background-color: #6c757d;
-  border-color: #6c757d;
-}
-
-.me-1 {
-  margin-right: 0.25rem;
-}
-
-.me-2 {
-  margin-right: 0.5rem;
-}
-
-.mt-3 {
-  margin-top: 1rem;
-}
-
-/* Calendar Filters - NEW SECTION */
-.calendar-filters {
-  background-color: #f8f9fa;
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 20px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+/* Filter card styling */
+.filter-card {
+  margin-bottom: 16px;
 }
 
 .filter-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 15px;
   align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
-.filter-group {
-  flex: 1;
-  min-width: 180px;
-  margin-bottom: 5px;
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.filter-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: 500;
-  font-size: 0.9rem;
-  color: #495057;
-}
-
-.filter-select {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  background-color: white;
-  color: #495057;
-  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-}
-
-.filter-select:focus {
-  border-color: #1565C0;
-  outline: 0;
-  box-shadow: 0 0 0 0.2rem rgba(21, 101, 192, 0.25);
+.filter-item label {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.65);
 }
 
 .filter-actions {
   display: flex;
-  gap: 10px;
   margin-left: auto;
+  gap: 8px;
 }
 
-.filter-summary {
-  margin-top: 10px;
-  font-size: 0.85rem;
-  color: #6c757d;
-  font-style: italic;
+.filter-tag {
+  margin-left: 8px;
 }
 
-/* Laboratory Calendar */
-.laboratory-calendar {
-  background-color: #FFFFFF;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  padding: 20px;
-  margin-bottom: 20px;
+/* Purpose legend styling */
+.purpose-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
 }
 
-/* FullCalendar Overrides */
-.laboratory-calendar .fc-toolbar-title {
-  font-size: 1.5rem;
-  color: #1565C0;
+.purpose-legend span:first-child {
+  color: rgba(0, 0, 0, 0.65);
 }
 
-.laboratory-calendar .fc-button-primary {
-  background-color: #1565C0;
-  border-color: #1565C0;
+/* Calendar card styling */
+.calendar-card {
+  margin-bottom: 16px;
 }
 
-.laboratory-calendar .fc-button-primary:hover {
-  background-color: #0D47A1;
-  border-color: #0D47A1;
-}
-
-.laboratory-calendar .fc-button-active {
-  background-color: #0D47A1 !important;
-  border-color: #0D47A1 !important;
-}
-
-.laboratory-calendar .fc-event {
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.laboratory-calendar .fc-col-header-cell-cushion {
-  padding: 8px 4px;
-}
-
-.laboratory-calendar .fc-daygrid-day-number {
-  padding: 6px;
-}
-
-.laboratory-calendar .fc-timegrid-slot-label {
-  font-size: 0.8rem;
-}
-
-.laboratory-calendar .fc-scroller {
-  overflow-y: auto !important;
-  height: auto !important;
-}
-
-/* Loading Container */
+/* Loading container */
 .loading-container {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 300px;
-  background-color: #FFFFFF;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  color: #6c757d;
+  min-height: 400px;
 }
 
-/* Error Handling */
-.error-message {
-  background-color: #f8d7da;
-  color: #721c24;
-  padding: 15px 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  border-left: 4px solid #dc3545;
+/* Enhance FullCalendar styling to work better with Ant Design */
+.fc .fc-toolbar.fc-header-toolbar {
+  margin-bottom: 1.5em;
+  flex-wrap: wrap;
 }
 
-.error-message h3 {
-  margin-top: 0;
-  margin-bottom: 10px;
-  font-size: 1.1rem;
+.fc .fc-toolbar-title {
+  font-size: 1.5em;
+  font-weight: 500;
 }
 
-/* Weekend toggle selected color */
-.btn.weekend-toggle.selected {
-  background-color: #1565C0;
-  color: white;
+.fc .fc-button {
+  height: 32px;
+  padding: 4px 15px;
+  font-size: 14px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Responsive design */
-@media (max-width: 992px) {
-  .content-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .header-actions {
-    margin-top: 10px;
-    width: 100%;
-    justify-content: flex-start;
-  }
+.fc .fc-button-primary {
+  background-color: #1890ff;
+  border-color: #1890ff;
 }
 
+.fc .fc-button-primary:not(:disabled):hover {
+  background-color: #40a9ff;
+  border-color: #40a9ff;
+}
+
+.fc .fc-button-primary:not(:disabled):active {
+  background-color: #096dd9;
+  border-color: #096dd9;
+}
+
+.fc .fc-col-header-cell-cushion,
+.fc .fc-daygrid-day-number {
+  color: rgba(0, 0, 0, 0.85);
+  text-decoration: none;
+}
+
+.fc-theme-standard td, 
+.fc-theme-standard th,
+.fc-theme-standard .fc-scrollgrid {
+  border-color: #f0f0f0;
+}
+
+/* Day header styling */
+.fc .fc-col-header-cell {
+  padding: 8px 0;
+  background-color: #fafafa;
+}
+
+/* Today highlighting */
+.fc .fc-day-today {
+  background-color: rgba(24, 144, 255, 0.05) !important;
+}
+
+/* Responsive adjustments */
 @media (max-width: 768px) {
-  .header-actions {
-    flex-wrap: wrap;
-  }
-  
-  .btn-sm {
-    padding: 0.2rem 0.4rem;
-    font-size: 0.8rem;
-  }
-  
-  .laboratory-calendar {
-    padding: 10px;
-  }
-  
-  .laboratory-calendar .fc-toolbar {
-    flex-direction: column;
-    gap: 10px;
-  }
-  
-  .laboratory-calendar .fc-toolbar-title {
-    font-size: 1.2rem;
-  }
-  
   .filter-row {
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
   
-  .filter-group {
-    min-width: 100%;
+  .filter-item {
+    width: 100%;
   }
   
   .filter-actions {
-    margin-left: 0;
-    margin-top: 10px;
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
+    margin-left: 0;
   }
-}
-
-/* Today highlight */
-.laboratory-calendar .fc-day-today {
-  background-color: rgba(21, 101, 192, 0.05) !important;
-}
-
-/* Event hover effect */
-.laboratory-calendar .fc-event:hover {
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }

@@ -1,0 +1,292 @@
+/* Analytics.css - Enhanced with complete reporting features */
+
+.analytics-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.header-card {
+  margin-bottom: 16px;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.analytics-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.filter-card {
+  margin-bottom: 8px;
+}
+
+.date-range-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stats-row {
+  margin-bottom: 16px !important;
+}
+
+.section-card {
+  margin-bottom: 16px !important;
+}
+
+.hour-stats-card {
+  height: 100%;
+}
+
+/* Time distribution charts */
+.uptime-downtime-chart {
+  height: 100%;
+  padding: 10px;
+}
+
+.uptime-downtime-chart h4 {
+  margin-bottom: 16px;
+  font-size: 16px;
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.bar-chart-container {
+  margin-top: 20px;
+}
+
+.stacked-bar {
+  display: flex;
+  height: 40px;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.bar-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bar-segment.uptime {
+  background-color: #52c41a;
+  color: white;
+}
+
+.bar-segment.downtime {
+  background-color: #f5222d;
+  color: white;
+}
+
+.bar-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.color-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+}
+
+.color-box.uptime {
+  background-color: #52c41a;
+}
+
+.color-box.downtime {
+  background-color: #f5222d;
+}
+
+.color-box.utilization {
+  background-color: #1890ff;
+}
+
+.color-box.maintenance {
+  background-color: #faad14;
+}
+
+.color-box.broken {
+  background-color: #f5222d;
+}
+
+.color-box.idle {
+  background-color: #d9d9d9;
+}
+
+/* Equipment bar chart */
+.instrument-bar-chart {
+  padding: 16px 0;
+}
+
+.equipment-bar-container {
+  display: grid;
+  grid-template-columns: 200px 1fr 80px;
+  gap: 16px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.equipment-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+}
+
+.equipment-bar {
+  display: flex;
+  height: 24px;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.equipment-hours {
+  text-align: right;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.bar-segment.utilization {
+  background-color: #1890ff;
+}
+
+.bar-segment.maintenance {
+  background-color: #faad14;
+}
+
+.bar-segment.broken {
+  background-color: #f5222d;
+}
+
+.bar-segment.idle {
+  background-color: #d9d9d9;
+}
+
+.bar-chart-legend {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+/* Purpose breakdown container */
+.purpose-breakdown-container {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: 24px;
+}
+
+.purpose-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.purpose-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.downtime-stat {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Purpose mini charts */
+.purpose-mini-chart {
+  display: flex;
+  height: 6px;
+  width: 100%;
+  max-width: 100px;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.mini-bar {
+  height: 100%;
+}
+
+.mini-bar.utilization {
+  background-color: #1890ff;
+}
+
+.mini-bar.maintenance {
+  background-color: #faad14;
+}
+
+.mini-bar.broken {
+  background-color: #f5222d;
+}
+
+.purpose-mini-legend {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* Table summary row */
+.font-bold {
+  font-weight: 600;
+}
+
+/* Loading container */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .purpose-breakdown-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .equipment-bar-container {
+    grid-template-columns: 120px 1fr 70px;
+    gap: 8px;
+  }
+}
