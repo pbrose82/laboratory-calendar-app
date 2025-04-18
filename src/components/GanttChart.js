@@ -1,8 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  Card, Button, Select, Typography, Input, Space, 
+  Spin, Alert, Badge, Tag, Tooltip, Empty, Divider
+} from 'antd';
+import { 
+  CalendarOutlined, LeftOutlined, RightOutlined,
+  SearchOutlined, ReloadOutlined, FilterOutlined
+} from '@ant-design/icons';
 import { fetchTenant } from '../services/apiClient';
 import './ResourceViews.css';
-
+const { Option } = Select;
+const { Title, Text } = Typography;
+const { Search } = Input;
 function GanttChart() {
   const { tenantId } = useParams();
   const navigate = useNavigate();
@@ -333,214 +343,316 @@ ${event.notes ? `Notes: ${event.notes}` : ''}`;
   const filteredResources = getFilteredResources();
   const filteredEvents = getFilteredEvents();
 
+  // Handle manual refresh
+  const handleManualRefresh = () => {
+    loadTenantData(true);
+  };
+
   return (
     <div className="dashboard-container">
-      <div className="content-header">
-        <h1>{getDisplayName()} - Gantt Chart</h1>
-        <div className="header-actions">
-          <button 
-            className="btn btn-outline-secondary ms-2"
+      <Card 
+        title={
+          <Space>
+            <Title level={4} style={{ margin: 0 }}>{getDisplayName()} - Gantt Chart</Title>
+          </Space>
+        }
+        extra={
+          <Button 
+            type="primary" 
+            icon={<CalendarOutlined />}
             onClick={() => navigate(`/${tenantId}`)}
           >
-            <i className="fas fa-calendar-alt me-1"></i>
             Calendar View
-          </button>
-        </div>
-      </div>
-      
-      {loading ? (
-        <div className="loading-container">
-          <div>Loading gantt chart data...</div>
-        </div>
-      ) : error ? (
-        <div className="error-message">
-          <h3>Error</h3>
-          <p>{error}</p>
-          <button className="btn btn-primary mt-3" onClick={() => navigate('/')}>
-            Return to Main Dashboard
-          </button>
-        </div>
-      ) : (
-        <div className="gantt-chart">
-          <div className="gantt-header">
-            <div className="date-selector">
-              <button 
-                className="btn btn-outline-secondary me-2"
-                onClick={() => moveTimeRange('prev')}
-              >
-                <i className="fas fa-chevron-left"></i>
-              </button>
-              
-              <select 
-                className="filter-select me-2"
-                value={viewType}
-                onChange={(e) => handleViewChange(e.target.value)}
-              >
-                <option value="day">Day</option>
-                <option value="week">Week</option>
-              </select>
-              
-              <button 
-                className="btn btn-outline-secondary me-2"
-                onClick={() => moveTimeRange('next')}
-              >
-                <i className="fas fa-chevron-right"></i>
-              </button>
-              
-              <button 
-                className="btn btn-outline-secondary"
-                onClick={goToToday}
-              >
-                Today
-              </button>
-              
-              <span className="mx-4 font-semibold">{getViewTitle()}</span>
-            </div>
-            
-            <div className="filter-controls">
-              {/* Resource filter */}
-              <select 
-                className="filter-select me-2"
-                value={selectedResource}
-                onChange={(e) => setSelectedResource(e.target.value)}
-              >
-                <option value="all">All Equipment</option>
-                {resources.map((resource) => (
-                  <option key={resource.id} value={resource.id}>
-                    {resource.title || resource.name}
-                  </option>
-                ))}
-              </select>
-              
-              {/* Search input */}
-              <div className="search-input">
-                <input 
-                  type="text"
-                  placeholder="Search events..."
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  className="filter-input"
-                />
-                <i className="fas fa-search search-icon"></i>
-              </div>
-              
-              {/* Weekend toggle for week view */}
-              {viewType === 'week' && (
-                <button 
-                  className={`btn ${showWeekends ? 'btn-primary' : 'btn-outline-primary'} ms-2`}
-                  onClick={() => setShowWeekends(!showWeekends)}
-                >
-                  <i className="fas fa-calendar-week me-1"></i>
-                  {showWeekends ? "Hide Weekends" : "Show Weekends"}
-                </button>
-              )}
-            </div>
+          </Button>
+        }
+        style={{ width: '100%' }}
+      >
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+            <Spin size="large" tip="Loading gantt chart data..." />
           </div>
-          
-          {filteredResources.length === 0 ? (
-            <div className="text-center py-4 mt-4">
-              <i className="fas fa-microscope fa-3x mb-3 text-muted"></i>
-              <p>No equipment found. Equipment will appear here when added to calendar events.</p>
-            </div>
-          ) : (
-            <div className="gantt-container">
-              {/* Header row with day/hour columns */}
-              <div className="gantt-row gantt-header-row">
-                <div className="gantt-label"></div>
-                <div className="gantt-timeline">
-                  <div className="gantt-days">
-                    {days.map((day, index) => (
-                      <div 
-                        className={`gantt-day ${
-                          new Date().toDateString() === day.date.toDateString() ? 'today' : ''
-                        }`} 
-                        key={index}
-                      >
-                        {day.label}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Resource rows */}
-              {filteredResources.map(resource => (
-                <div className="gantt-row" key={resource.id}>
-                  <div 
-                    className="gantt-label" 
-                    onClick={() => navigate(`/${tenantId}?resourceId=${resource.id}`)}
-                    title="Click to view calendar for this equipment"
+        ) : error ? (
+          <Alert
+            message="Error"
+            description={
+              <>
+                <p>{error}</p>
+                <Button type="primary" onClick={() => navigate('/')}>
+                  Return to Main Dashboard
+                </Button>
+              </>
+            }
+            type="error"
+            showIcon
+          />
+        ) : (
+          <div className="gantt-chart">
+            <Card
+              size="small"
+              style={{ marginBottom: '16px' }}
+              bodyStyle={{ padding: '12px' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                <Space>
+                  <Button 
+                    icon={<LeftOutlined />}
+                    onClick={() => moveTimeRange('prev')}
+                  />
+                  
+                  <Select 
+                    value={viewType}
+                    onChange={handleViewChange}
+                    style={{ width: '100px' }}
                   >
-                    {resource.title || resource.name}
-                  </div>
-                  <div className="gantt-timeline">
-                    <div className="gantt-days">
+                    <Option value="day">Day</Option>
+                    <Option value="week">Week</Option>
+                  </Select>
+                  
+                  <Button 
+                    icon={<RightOutlined />}
+                    onClick={() => moveTimeRange('next')}
+                  />
+                  
+                  <Button 
+                    onClick={goToToday}
+                  >
+                    Today
+                  </Button>
+                  
+                  <Text strong style={{ marginLeft: '8px' }}>{getViewTitle()}</Text>
+                </Space>
+                
+                <Space style={{ marginTop: '8px' }}>
+                  <Select 
+                    placeholder="Select Equipment"
+                    value={selectedResource}
+                    onChange={setSelectedResource}
+                    style={{ width: '200px' }}
+                  >
+                    <Option value="all">All Equipment</Option>
+                    {resources.map((resource) => (
+                      <Option key={resource.id} value={resource.id}>
+                        {resource.title || resource.name}
+                      </Option>
+                    ))}
+                  </Select>
+                  
+                  <Search
+                    placeholder="Search events..."
+                    allowClear
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    style={{ width: '200px' }}
+                  />
+                  
+                  {viewType === 'week' && (
+                    <Button 
+                      type={showWeekends ? "primary" : "default"}
+                      onClick={() => setShowWeekends(!showWeekends)}
+                    >
+                      {showWeekends ? "Hide Weekends" : "Show Weekends"}
+                    </Button>
+                  )}
+                  
+                  <Tooltip title="Refresh Data">
+                    <Button 
+                      icon={<ReloadOutlined />} 
+                      onClick={handleManualRefresh}
+                    />
+                  </Tooltip>
+                </Space>
+              </div>
+            </Card>
+            
+            {filteredResources.length === 0 ? (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="No equipment found. Equipment will appear here when added to calendar events."
+                style={{ margin: '40px 0' }}
+              />
+            ) : (
+              <div className="gantt-container" style={{ border: '1px solid #f0f0f0', borderRadius: '4px' }}>
+                {/* Header row with day/hour columns */}
+                <div className="gantt-row gantt-header-row" style={{ backgroundColor: '#f5f5f5', padding: '8px 0' }}>
+                  <div className="gantt-label" style={{ width: '150px', padding: '0 12px', fontWeight: 'bold' }}></div>
+                  <div className="gantt-timeline" style={{ flex: 1, position: 'relative' }}>
+                    <div className="gantt-days" style={{ display: 'flex' }}>
                       {days.map((day, index) => (
-                        <div className="gantt-day" key={index}></div>
+                        <div 
+                          className={`gantt-day ${
+                            new Date().toDateString() === day.date.toDateString() ? 'today' : ''
+                          }`} 
+                          key={index}
+                          style={{ 
+                            flex: 1, 
+                            textAlign: 'center',
+                            backgroundColor: new Date().toDateString() === day.date.toDateString() ? '#e6f7ff' : 'transparent',
+                            fontWeight: 'bold',
+                            padding: '4px 0'
+                          }}
+                        >
+                          {day.label}
+                        </div>
                       ))}
                     </div>
-                    
-                    {/* Current time indicator for day view */}
-                    {viewType === 'day' && 
-                      new Date().toDateString() === startDate.toDateString() && (
-                      <div 
-                        className="current-time-indicator" 
-                        style={{
-                          left: `${((new Date().getHours() + (new Date().getMinutes() / 60) - 6) / 14) * 100}%`
-                        }}
-                      ></div>
-                    )}
-                    
-                    {/* Event bars */}
-                    {filteredEvents
-                      .filter(event => 
-                        event.resourceId === resource.id || 
-                        event.equipment === resource.title
-                      )
-                      .map((event, eventIndex) => {
-                        const position = getEventPosition(event, days);
-                        if (!position) return null;
-                        
-                        // Extract ER number if present
-                        const erMatch = event.title.match(/ER\d+/);
-                        const shortTitle = erMatch ? erMatch[0] : 
-                                         event.title.length > 10 ? 
-                                         `${event.title.substring(0, 10)}...` : 
-                                         event.title;
-                        
-                        return (
-                          <div 
-                            className="gantt-bar"
-                            key={eventIndex}
-                            style={position}
-                            title={getEventTooltip(event)}
-                            onClick={() => {
-                              // Show detailed event info
-                              alert(getEventTooltip(event));
-                            }}
-                          >
-                            {shortTitle}
-                          </div>
-                        );
-                      })}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-          
-          <div className="gantt-legend">
-            <div className="legend-item">
-              <div className="legend-color"></div>
-              <div className="legend-label">Equipment Reservation</div>
-            </div>
+                
+                {/* Resource rows */}
+                {filteredResources.map(resource => (
+                  <div 
+                    className="gantt-row" 
+                    key={resource.id}
+                    style={{ 
+                      display: 'flex', 
+                      borderTop: '1px solid #f0f0f0',
+                      minHeight: '50px'
+                    }}
+                  >
+                    <div 
+                      className="gantt-label"
+                      style={{ 
+                        width: '150px', 
+                        padding: '12px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        backgroundColor: '#fafafa'
+                      }}
+                      onClick={() => navigate(`/${tenantId}?resourceId=${resource.id}`)}
+                    >
+                      <Tooltip title="Click to view calendar for this equipment">
+                        {resource.title || resource.name}
+                      </Tooltip>
+                    </div>
+                    <div 
+                      className="gantt-timeline"
+                      style={{ 
+                        flex: 1, 
+                        position: 'relative',
+                        minHeight: '50px'
+                      }}
+                    >
+                      <div 
+                        className="gantt-days"
+                        style={{ 
+                          display: 'flex',
+                          height: '100%',
+                          position: 'absolute',
+                          width: '100%'
+                        }}
+                      >
+                        {days.map((day, index) => (
+                          <div 
+                            className="gantt-day" 
+                            key={index}
+                            style={{ 
+                              flex: 1, 
+                              borderLeft: index > 0 ? '1px dashed #eee' : 'none',
+                              height: '100%'
+                            }}
+                          ></div>
+                        ))}
+                      </div>
+                      
+                      {/* Current time indicator for day view */}
+                      {viewType === 'day' && 
+                        new Date().toDateString() === startDate.toDateString() && (
+                        <div 
+                          className="current-time-indicator" 
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            bottom: 0,
+                            width: '2px',
+                            backgroundColor: '#f5222d',
+                            left: `${((new Date().getHours() + (new Date().getMinutes() / 60) - 6) / 14) * 100}%`,
+                            zIndex: 10
+                          }}
+                        ></div>
+                      )}
+                      
+                      {/* Event bars */}
+                      {filteredEvents
+                        .filter(event => 
+                          event.resourceId === resource.id || 
+                          event.equipment === resource.title
+                        )
+                        .map((event, eventIndex) => {
+                          const position = getEventPosition(event, days);
+                          if (!position) return null;
+                          
+                          // Extract ER number if present
+                          const erMatch = event.title.match(/ER\d+/);
+                          const shortTitle = erMatch ? erMatch[0] : 
+                                          event.title.length > 10 ? 
+                                          `${event.title.substring(0, 10)}...` : 
+                                          event.title;
+                          
+                          return (
+                            <Tooltip 
+                              title={getEventTooltip(event)}
+                              key={eventIndex}
+                            >
+                              <div 
+                                className="gantt-bar"
+                                style={{
+                                  position: 'absolute',
+                                  top: '8px',
+                                  height: 'calc(100% - 16px)',
+                                  backgroundColor: '#1890ff',
+                                  borderRadius: '3px',
+                                  color: 'white',
+                                  padding: '2px 6px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  ...position
+                                }}
+                                onClick={() => {
+                                  // Show detailed event info using Ant Design modal
+                                  // For simplicity, using alert here like the original
+                                  alert(getEventTooltip(event));
+                                }}
+                              >
+                                {shortTitle}
+                              </div>
+                            </Tooltip>
+                          );
+                        })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             
-            <div className="event-count">
-              {filteredEvents.length} events • {filteredResources.length} equipment
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginTop: '16px',
+              padding: '8px',
+              backgroundColor: '#fafafa',
+              borderRadius: '4px'
+            }}>
+              <Space>
+                <Badge color="#1890ff" text="Equipment Reservation" />
+              </Space>
+              
+              <Space>
+                <Tag color="blue">{filteredEvents.length} events</Tag>
+                <Tag color="green">{filteredResources.length} equipment</Tag>
+                {lastRefreshTime && (
+                  <Text type="secondary">
+                    Last refreshed: {lastRefreshTime.toLocaleTimeString()}
+                  </Text>
+                )}
+              </Space>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Card>
     </div>
   );
 }
