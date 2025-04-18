@@ -1,716 +1,434 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import { fetchTenant, processCalendarEvent } from '../services/apiClient';
-import { demoTenantEvents, demoTenantResources } from '../data/sample-events';
-import './TenantCalendar.css';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Badge, Select, Button, Tag, Spin, Card, Statistic, Row, Col, Tooltip, Alert } from 'antd';
+import { CheckCircleOutlined, ExclamationCircleOutlined, CloseCircleOutlined, CalendarOutlined, FilterOutlined, ReloadOutlined } from '@/components/ui/alert';
 
-// Helper function defined outside of component to ensure ISO date format
-const ensureISODateFormat = (events) => {
-  if (!Array.isArray(events)) return [];
-  
-  return events.map(event => {
-    const newEvent = { ...event };
-    
-    // Check if start is not already in ISO format
-    if (event.start && typeof event.start === 'string' && !event.start.includes('T')) {
-      try {
-        const startDate = new Date(event.start);
-        if (!isNaN(startDate.getTime())) {
-          newEvent.start = startDate.toISOString();
-        }
-      } catch (e) {
-        console.warn(`Failed to parse start date: ${event.start}`);
-      }
-    }
-    
-    // Check if end is not already in ISO format
-    if (event.end && typeof event.end === 'string' && !event.end.includes('T')) {
-      try {
-        const endDate = new Date(event.end);
-        if (!isNaN(endDate.getTime())) {
-          newEvent.end = endDate.toISOString();
-        }
-      } catch (e) {
-        console.warn(`Failed to parse end date: ${event.end}`);
-      }
-    }
-    
-    return newEvent;
-  });
-};
+const { Option } = Select;
 
-// Helper to get purpose-based CSS class for events
-const getPurposeClass = (purpose) => {
-  switch(purpose?.toLowerCase()) {
-    case 'maintenance':
-      return 'event-maintenance';
-    case 'broken':
-      return 'event-broken';
-    case 'utilization':
-    default:
-      return 'event-utilization';
-  }
-};
-
-function TenantCalendar() {
-  const { tenantId } = useParams();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [events, setEvents] = useState([]);
-  const [filteredEvents, setFilteredEvents] = useState([]);
-  const [resources, setResources] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [tenantName, setTenantName] = useState('');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [showWeekends, setShowWeekends] = useState(true);
-  
-  // Filter states
-  const [equipmentFilter, setEquipmentFilter] = useState('all');
-  const [technicianFilter, setTechnicianFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [purposeFilter, setPurposeFilter] = useState('all'); // New filter for purpose
-  
-  // Track unique values for filters
-  const [uniqueEquipment, setUniqueEquipment] = useState([]);
-  const [uniqueTechnicians, setUniqueTechnicians] = useState([]);
-  
-  // Reference to track if component is mounted
-  const isMounted = useRef(true);
-  
-  // Get resource filter from URL query params if present
-  const searchParams = new URLSearchParams(location.search);
-  const resourceFilter = searchParams.get('resourceId');
-
-  // Function to load tenant data - now handles both initial load and background refresh
-  const handleReloadData = async (isInitialLoad = false) => {
-    try {
-      if (isInitialLoad) {
-        setLoading(true);
-      }
-      
-      // Special handling for demo tenant
-      if (tenantId === 'demo-tenant') {
-        // For demo tenant, check if we have saved data in localStorage
-        const savedDemoData = localStorage.getItem('demo-tenant-events');
-        if (savedDemoData) {
-          const parsedEvents = JSON.parse(savedDemoData);
-          // Add sample purpose and cost data if not present
-          const enhancedEvents = parsedEvents.map(event => ({
-            ...event,
-            purpose: event.purpose || ['Utilization', 'Maintenance', 'Broken'][Math.floor(Math.random() * 3)],
-            cost: event.cost || Math.floor(Math.random() * 1000)
-          }));
-          
-          setEvents(enhancedEvents);
-          updateFilterOptions(enhancedEvents);
-          applyFilters(enhancedEvents);
-          
-          // Save back the enhanced data
-          localStorage.setItem('demo-tenant-events', JSON.stringify(enhancedEvents));
-        } else {
-          // Add purpose and cost to demo events
-          const enhancedDemoEvents = demoTenantEvents.map(event => ({
-            ...event,
-            purpose: ['Utilization', 'Maintenance', 'Broken'][Math.floor(Math.random() * 3)],
-            cost: Math.floor(Math.random() * 1000)
-          }));
-          
-          setEvents(enhancedDemoEvents);
-          updateFilterOptions(enhancedDemoEvents);
-          applyFilters(enhancedDemoEvents);
-          
-          // Save initial demo data to localStorage
-          localStorage.setItem('demo-tenant-events', JSON.stringify(enhancedDemoEvents));
-        }
-        setResources(demoTenantResources);
-        setTenantName('Demo Tenant');
-        if (isInitialLoad) {
-          setLoading(false);
-        }
-        return;
-      }
-      
-      // Special handling for Product CASE UAT tenant
-      if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
-        setTenantName('Product CASE UAT');
-      }
-      
-      // Normal tenant handling from API
-      const tenantData = await fetchTenant(tenantId);
-      
-      if (tenantData && isMounted.current) {
-        // Process events to ensure ISO date format
-        const formattedEvents = ensureISODateFormat(tenantData.events || []);
-        setEvents(formattedEvents);
-        
-        // Update filter options and apply filters
-        updateFilterOptions(formattedEvents);
-        applyFilters(formattedEvents);
-        
-        setResources(tenantData.resources || []);
-        if (!tenantName) {
-          setTenantName(tenantData.name || tenantId);
-        }
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Calendar data refreshed at', new Date().toLocaleTimeString());
-        }
-      }
-    } catch (err) {
-      if (isMounted.current) {
-        console.error('Failed to load tenant data:', err);
-        setError(`Error loading tenant data: ${err.message}`);
-      }
-    } finally {
-      if (isInitialLoad && isMounted.current) {
-        setLoading(false);
-      }
+// Custom Event Component
+const EventItem = ({ event }) => {
+  const getPurposeColor = (purpose) => {
+    switch (purpose?.toLowerCase()) {
+      case 'maintenance': return '#FBBC05';
+      case 'broken': return '#EA4335';
+      default: return '#4285F4';
     }
   };
 
-  // Extract unique values for filter dropdowns
+  return (
+    <Tooltip title={`${event.title} - ${event.equipment || 'No equipment'} (${event.cost ? `$${event.cost}` : 'No cost'})`}>
+      <div className="event-item" style={{ 
+        backgroundColor: getPurposeColor(event.purpose),
+        padding: '2px 6px',
+        borderRadius: '3px',
+        margin: '2px 0',
+        color: event.purpose?.toLowerCase() === 'maintenance' ? '#333' : '#fff',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        fontSize: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <span>{event.title}</span>
+        {event.cost && <span className="cost-badge" style={{ 
+          fontSize: '10px', 
+          background: 'rgba(0,0,0,0.15)', 
+          padding: '0 3px', 
+          borderRadius: '2px',
+          marginLeft: '4px'
+        }}>${event.cost}</span>}
+      </div>
+    </Tooltip>
+  );
+};
+
+function EnhancedCalendar() {
+  const [events, setEvents] = useState([]);
+  const [filteredEvents, setFilteredEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [equipmentFilter, setEquipmentFilter] = useState('all');
+  const [technicianFilter, setTechnicianFilter] = useState('all');
+  const [purposeFilter, setPurposeFilter] = useState('all');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [uniqueEquipment, setUniqueEquipment] = useState([]);
+  const [uniqueTechnicians, setUniqueTechnicians] = useState([]);
+  const [showWeekends, setShowWeekends] = useState(true);
+  const [viewMode, setViewMode] = useState('month');
+
+  // Sample data for the calendar
+  const sampleEvents = [
+    {
+      id: '1',
+      title: 'HPLC Analysis',
+      start: new Date(2025, 3, 15, 9, 0),
+      end: new Date(2025, 3, 15, 12, 0),
+      equipment: 'HPLC Agilent 1260',
+      technician: 'John Smith',
+      purpose: 'Utilization',
+      cost: 350
+    },
+    {
+      id: '2',
+      title: 'Mass Spec Maintenance',
+      start: new Date(2025, 3, 16, 13, 0),
+      end: new Date(2025, 3, 16, 16, 0),
+      equipment: 'Mass Spec AB Sciex',
+      technician: 'Maria Johnson',
+      purpose: 'Maintenance',
+      cost: 650
+    },
+    {
+      id: '3',
+      title: 'NMR Repair',
+      start: new Date(2025, 3, 17, 10, 0),
+      end: new Date(2025, 3, 17, 15, 0),
+      equipment: 'NMR Bruker 400MHz',
+      technician: 'David Williams',
+      purpose: 'Broken',
+      cost: 1250
+    },
+    {
+      id: '4',
+      title: 'PCR Analysis',
+      start: new Date(2025, 3, 18, 9, 0),
+      end: new Date(2025, 3, 18, 11, 0),
+      equipment: 'PCR Thermal Cycler',
+      technician: 'John Smith',
+      purpose: 'Utilization',
+      cost: 280
+    },
+    {
+      id: '5',
+      title: 'Microplate Reading',
+      start: new Date(2025, 3, 19, 14, 0),
+      end: new Date(2025, 3, 19, 16, 0),
+      equipment: 'Microplate Reader',
+      technician: 'Lisa Brown',
+      purpose: 'Utilization',
+      cost: 190
+    },
+    {
+      id: '6',
+      title: 'HPLC Calibration',
+      start: new Date(2025, 3, 20, 10, 0),
+      end: new Date(2025, 3, 20, 12, 0),
+      equipment: 'HPLC Agilent 1260',
+      technician: 'Maria Johnson',
+      purpose: 'Maintenance',
+      cost: 420
+    },
+    {
+      id: '7',
+      title: 'Mass Spec Analysis',
+      start: new Date(2025, 3, 21, 13, 0),
+      end: new Date(2025, 3, 21, 17, 0),
+      equipment: 'Mass Spec AB Sciex',
+      technician: 'John Smith',
+      purpose: 'Utilization',
+      cost: 780
+    }
+  ];
+
+  // Load data on component mount
+  useEffect(() => {
+    // Simulate API call
+    setTimeout(() => {
+      setEvents(sampleEvents);
+      setFilteredEvents(sampleEvents);
+      updateFilterOptions(sampleEvents);
+      setLoading(false);
+    }, 1000);
+  }, []);
+
+  // Update filter options based on events
   const updateFilterOptions = (eventsData) => {
-    // Extract unique equipment names
     const equipmentSet = new Set();
-    eventsData.forEach(event => {
-      if (event.equipment) {
-        equipmentSet.add(event.equipment);
-      } else if (event.extendedProps && event.extendedProps.equipment) {
-        equipmentSet.add(event.extendedProps.equipment);
-      }
-    });
-    
-    // Extract unique technician names
     const technicianSet = new Set();
+    
     eventsData.forEach(event => {
-      if (event.technician) {
-        technicianSet.add(event.technician);
-      } else if (event.extendedProps && event.extendedProps.technician) {
-        technicianSet.add(event.extendedProps.technician);
-      }
+      if (event.equipment) equipmentSet.add(event.equipment);
+      if (event.technician) technicianSet.add(event.technician);
     });
     
     setUniqueEquipment(Array.from(equipmentSet).sort());
     setUniqueTechnicians(Array.from(technicianSet).sort());
   };
 
-  // Apply filters to the events
-  const applyFilters = (eventsData) => {
-    let filtered = [...eventsData];
+  // Apply filters to events
+  useEffect(() => {
+    let filtered = [...events];
     
-    // Apply equipment filter
     if (equipmentFilter !== 'all') {
-      filtered = filtered.filter(event => {
-        const equipment = event.equipment || (event.extendedProps && event.extendedProps.equipment);
-        return equipment === equipmentFilter;
-      });
+      filtered = filtered.filter(event => event.equipment === equipmentFilter);
     }
     
-    // Apply technician filter
     if (technicianFilter !== 'all') {
-      filtered = filtered.filter(event => {
-        const technician = event.technician || (event.extendedProps && event.extendedProps.technician);
-        return technician === technicianFilter;
-      });
+      filtered = filtered.filter(event => event.technician === technicianFilter);
     }
     
-    // Apply purpose filter (new)
     if (purposeFilter !== 'all') {
-      filtered = filtered.filter(event => {
-        const purpose = event.purpose || 
-                       (event.extendedProps && event.extendedProps.purpose) || 
-                       'Utilization'; // Default if not specified
-        return purpose === purposeFilter;
-      });
-    }
-    
-    // Apply status filter - based on date
-    if (statusFilter !== 'all') {
-      const now = new Date();
-      
-      filtered = filtered.filter(event => {
-        try {
-          const startDate = new Date(event.start);
-          const endDate = new Date(event.end);
-          
-          if (statusFilter === 'upcoming') {
-            return startDate > now;
-          } else if (statusFilter === 'ongoing') {
-            return startDate <= now && endDate >= now;
-          } else if (statusFilter === 'completed') {
-            return endDate < now;
-          }
-          return true;
-        } catch (e) {
-          console.warn('Error parsing event dates for status filter:', e);
-          return true;
-        }
-      });
+      filtered = filtered.filter(event => event.purpose === purposeFilter);
     }
     
     setFilteredEvents(filtered);
-  };
+  }, [equipmentFilter, technicianFilter, purposeFilter, events]);
 
-  // Handle filter changes
-  const handleEquipmentFilterChange = (e) => {
-    setEquipmentFilter(e.target.value);
-  };
-  
-  const handleTechnicianFilterChange = (e) => {
-    setTechnicianFilter(e.target.value);
-  };
-  
-  const handleStatusFilterChange = (e) => {
-    setStatusFilter(e.target.value);
-  };
-  
-  const handlePurposeFilterChange = (e) => {
-    setPurposeFilter(e.target.value);
-  };
-  
   // Reset all filters
   const resetFilters = () => {
     setEquipmentFilter('all');
     setTechnicianFilter('all');
-    setStatusFilter('all');
     setPurposeFilter('all');
   };
 
-  // Initial data load and auth check
-  useEffect(() => {
-    // Check if admin is authenticated
-    const adminAuth = sessionStorage.getItem('adminAuthenticated');
-    setIsAdminAuthenticated(adminAuth === 'true');
-    
-    if (tenantId) {
-      handleReloadData(true);
-    }
-    
-    // Cleanup function
-    return () => {
-      isMounted.current = false;
-    };
-  }, [tenantId]);
-  
-  // Set up automatic background refresh
-  useEffect(() => {
-    // Refresh data every 30 seconds
-    const refreshInterval = setInterval(() => {
-      if (isMounted.current) {
-        handleReloadData(false);
-      }
-    }, 30000);
-    
-    // Clean up interval on component unmount
-    return () => {
-      clearInterval(refreshInterval);
-    };
-  }, [tenantId]);
-  
-  // Update filtered events when filters or events change
-  useEffect(() => {
-    applyFilters(events);
-  }, [equipmentFilter, technicianFilter, statusFilter, purposeFilter, events]);
-
-  const handleDateSelect = async (selectInfo) => {
-    const title = prompt('Please enter a new event title:');
-    if (!title) return; // User canceled or provided empty title
-    
-    const calendarApi = selectInfo.view.calendar;
-    calendarApi.unselect(); // Clear date selection
-    
-    try {
-      // Create new event object
-      const newEvent = {
-        id: Date.now().toString(),
-        title,
-        start: selectInfo.startStr,
-        end: selectInfo.endStr,
-        allDay: selectInfo.allDay,
-        resourceId: resources.length > 0 ? resources[0].id : undefined,
-        purpose: 'Utilization', // Default purpose for new events
-        cost: 0 // Default cost for new events
-      };
-      
-      // For demo tenant, handle with localStorage
-      if (tenantId === 'demo-tenant') {
-        const updatedEvents = [...events, newEvent];
-        setEvents(updatedEvents);
-        calendarApi.addEvent(newEvent);
-        
-        // Save to localStorage
-        localStorage.setItem('demo-tenant-events', JSON.stringify(updatedEvents));
-        return;
-      }
-      
-      // Process through API to save to backend
-      const savedEvent = await processCalendarEvent(tenantId, newEvent, 'create');
-      console.log('Event created successfully:', savedEvent);
-      
-      // Add to calendar
-      calendarApi.addEvent(savedEvent);
-      
-      // Update local state
-      setEvents(prevEvents => [...prevEvents, savedEvent]);
-    } catch (error) {
-      console.error('Error creating event:', error);
-      alert(`Error creating event: ${error.message}`);
-    }
+  // Get events for a specific date
+  const getEventsForDate = (date) => {
+    return filteredEvents.filter(event => {
+      const eventDate = new Date(event.start);
+      return eventDate.getDate() === date.getDate() &&
+             eventDate.getMonth() === date.getMonth() &&
+             eventDate.getFullYear() === date.getFullYear();
+    });
   };
 
-  const handleEventClick = (clickInfo) => {
-    const event = clickInfo.event;
+  // Calendar cell renderer
+  const dateCellRender = (value) => {
+    const eventsForDay = getEventsForDate(value.toDate());
     
-    // Log the full event data for debugging
-    console.log('Clicked event full data:', event);
-    
-    // Find the resource title if a resourceId is assigned
-    const resourceTitle = resources.find(r => r.id === event.resourceId)?.title || 'None';
-
-    // Build a comprehensive details message with all available properties
-    let detailsMessage = `
-Event Details:
-Title: ${event.title}
-Start: ${event.start.toLocaleString()}
-End: ${event.end ? event.end.toLocaleString() : 'N/A'}
-`;
-    
-    // Add all properties that might exist
-    // First check top-level props, then check extendedProps
-    const checkAndAddProp = (propName, label) => {
-      // First check if it's directly in event object
-      if (event[propName] !== undefined) {
-        detailsMessage += `\n${label}: ${event[propName]}`;
-      } 
-      // Then check if it's in extendedProps
-      else if (event.extendedProps && event.extendedProps[propName] !== undefined) {
-        detailsMessage += `\n${label}: ${event.extendedProps[propName]}`;
-      }
-    };
-    
-    // Check all possible properties
-    checkAndAddProp('location', 'Location');
-    checkAndAddProp('equipment', 'Equipment');
-    if (event.resourceId) {
-      detailsMessage += `\nResource: ${resourceTitle} (ID: ${event.resourceId})`;
-    }
-    checkAndAddProp('technician', 'Technician');
-    checkAndAddProp('sampleType', 'Sample Type');
-    checkAndAddProp('notes', 'Notes');
-    checkAndAddProp('recordId', 'Record ID');
-    
-    // Add new properties
-    checkAndAddProp('purpose', 'Purpose');
-    checkAndAddProp('cost', 'Cost');
-    
-    // Check if there's an event link and handle it
-    const eventLink = event.extendedProps?.eventLink || event.eventLink;
-    if (eventLink) {
-      // Extract link from the eventLink text if it contains a URL
-      const linkMatch = eventLink.match(/(https:\/\/[^\s]+)/);
-      if (linkMatch && linkMatch[0]) {
-        const url = linkMatch[0];
-        // Add the link info to the details message
-        detailsMessage += `\n\nAlchemy Record: ${url}`;
-        
-        // Ask if the user wants to open the link
-        if (window.confirm(`${detailsMessage}\n\nDo you want to open the Alchemy record?`)) {
-          window.open(url, '_blank');
-          return; // Return early since we already showed the confirm dialog
-        }
-      } else {
-        // If no URL could be extracted, just display the eventLink text
-        detailsMessage += `\n\nEvent Link: ${eventLink}`;
-      }
-    }
-    
-    // Show the alert with all details (only if we didn't already show a confirm dialog)
-    alert(detailsMessage);
-  };
-  
-  const handleEventDrop = async (eventDropInfo) => {
-    try {
-      const { event } = eventDropInfo;
-      
-      // Get updated event data
-      const updatedEvent = {
-        id: event.id,
-        start: event.startStr,
-        end: event.endStr
-      };
-      
-      // For demo tenant, handle with localStorage
-      if (tenantId === 'demo-tenant') {
-        const updatedEvents = events.map(e => 
-          e.id === updatedEvent.id ? {...e, ...updatedEvent} : e
-        );
-        setEvents(updatedEvents);
-        
-        // Save to localStorage
-        localStorage.setItem('demo-tenant-events', JSON.stringify(updatedEvents));
-        return;
-      }
-      
-      // Update on server
-      await processCalendarEvent(tenantId, updatedEvent, 'update');
-      console.log('Event updated successfully');
-    } catch (error) {
-      console.error('Error updating event:', error);
-      alert(`Error updating event: ${error.message}`);
-      eventDropInfo.revert();
-    }
+    return (
+      <div className="events">
+        {eventsForDay.slice(0, 3).map(event => (
+          <EventItem key={event.id} event={event} />
+        ))}
+        {eventsForDay.length > 3 && (
+          <div style={{ fontSize: '11px', textAlign: 'center', color: '#666', marginTop: '2px' }}>
+            +{eventsForDay.length - 3} more
+          </div>
+        )}
+      </div>
+    );
   };
 
-  // Handle event deletion
-  const handleEventRemove = async (removeInfo) => {
-    const { event } = removeInfo;
-    
-    if (window.confirm(`Are you sure you want to delete the event '${event.title}'?`)) {
-      try {
-        // For demo tenant, handle with localStorage
-        if (tenantId === 'demo-tenant') {
-          const updatedEvents = events.filter(e => e.id !== event.id);
-          setEvents(updatedEvents);
-          
-          // Save to localStorage
-          localStorage.setItem('demo-tenant-events', JSON.stringify(updatedEvents));
-          return;
-        }
-        
-        // Delete on server
-        await processCalendarEvent(tenantId, { id: event.id }, 'delete');
-        console.log('Event deleted successfully');
-      } catch (error) {
-        console.error('Error deleting event:', error);
-        alert(`Error deleting event: ${error.message}`);
-        removeInfo.revert();
-      }
-    } else {
-      removeInfo.revert();
-    }
-  };
-
-  // Toggle function for showing/hiding weekends
-  const toggleWeekends = () => {
-    setShowWeekends(!showWeekends);
-  };
-
-  // Get display name for the tenant
-  const getDisplayName = () => {
-    if (tenantId === 'demo-tenant') {
-      return 'Demo Tenant';
-    } else if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
-      return 'Product CASE UAT';
-    } else {
-      return tenantName || tenantId;
+  // Get purpose label for display
+  const getPurposeLabel = (purpose) => {
+    switch (purpose) {
+      case 'Maintenance':
+        return <Tag color="gold" icon={<ExclamationCircleOutlined />}>Maintenance</Tag>;
+      case 'Broken':
+        return <Tag color="error" icon={<CloseCircleOutlined />}>Broken</Tag>;
+      default:
+        return <Tag color="blue" icon={<CheckCircleOutlined />}>Utilization</Tag>;
     }
   };
 
   return (
-    <div className="dashboard-container">
-      <div className="content-header">
-        <h1>{getDisplayName()}</h1>
-        <div className="header-actions">
-          {/* Admin button if authenticated */}
-          {isAdminAuthenticated && (
-            <button 
-              className="btn btn-outline-primary"
-              onClick={() => navigate('/admin')}
-            >
-              <i className="fas fa-cog me-1"></i>
-              Admin
-            </button>
-          )}
+    <div className="calendar-container bg-gray-50 min-h-screen pb-8">
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <h1 className="text-2xl font-bold text-gray-900">Lab Equipment Calendar</h1>
+            <div className="flex space-x-3">
+              <Button 
+                type="primary"
+                icon={<CalendarOutlined />}
+                onClick={() => console.log('Switch to Analytics')}
+              >
+                View Analytics
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Filter Controls */}
-      {!loading && !error && (
-        <div className="calendar-filters">
-          <div className="filter-row">
-            <div className="filter-group">
-              <label htmlFor="equipmentFilter">Equipment:</label>
-              <select 
-                id="equipmentFilter" 
-                value={equipmentFilter} 
-                onChange={handleEquipmentFilterChange}
-                className="filter-select"
-              >
-                <option value="all">All Equipment</option>
-                {uniqueEquipment.map(item => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="filter-group">
-              <label htmlFor="technicianFilter">Technician:</label>
-              <select 
-                id="technicianFilter" 
-                value={technicianFilter} 
-                onChange={handleTechnicianFilterChange}
-                className="filter-select"
-              >
-                <option value="all">All Technicians</option>
-                {uniqueTechnicians.map(item => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="filter-group">
-              <label htmlFor="purposeFilter">Purpose:</label>
-              <select 
-                id="purposeFilter" 
-                value={purposeFilter} 
-                onChange={handlePurposeFilterChange}
-                className="filter-select"
-              >
-                <option value="all">All Purposes</option>
-                <option value="Utilization">Utilization</option>
-                <option value="Maintenance">Maintenance</option>
-                <option value="Broken">Broken</option>
-              </select>
-            </div>
-            
-            <div className="filter-group">
-              <label htmlFor="statusFilter">Status:</label>
-              <select 
-                id="statusFilter" 
-                value={statusFilter} 
-                onChange={handleStatusFilterChange}
-                className="filter-select"
-              >
-                <option value="all">All Status</option>
-                <option value="upcoming">Upcoming</option>
-                <option value="ongoing">Ongoing</option>
-                <option value="completed">Completed</option>
-              </select>
-            </div>
-          </div>
-          
-          <div className="filter-actions">
-            <button 
-              className="btn btn-sm btn-outline-secondary"
-              onClick={resetFilters}
-            >
-              <i className="fas fa-undo me-1"></i>
-              Reset Filters
-            </button>
-            
-            <button 
-              className={`btn btn-sm ${showWeekends ? 'btn-outline-primary' : 'btn-primary'}`}
-              onClick={toggleWeekends}
-            >
-              <i className="fas fa-calendar-week me-1"></i>
-              {showWeekends ? "Hide Weekends" : "Show Weekends"}
-            </button>
-          </div>
-          
-          {/* Filter summary */}
-          <div className="filter-summary">
-            Showing {filteredEvents.length} of {events.length} events
-            {equipmentFilter !== 'all' && ` • Equipment: ${equipmentFilter}`}
-            {technicianFilter !== 'all' && ` • Technician: ${technicianFilter}`}
-            {purposeFilter !== 'all' && ` • Purpose: ${purposeFilter}`}
-            {statusFilter !== 'all' && ` • Status: ${statusFilter}`}
-          </div>
-        </div>
-      )}
-      
       {loading ? (
-        <div className="laboratory-calendar loading-container">
-          <div>Loading tenant calendar...</div>
+        <div className="flex items-center justify-center h-64">
+          <Spin size="large" tip="Loading calendar data..." />
         </div>
       ) : error ? (
-        <div className="laboratory-calendar">
-          <div className="error-message">
-            <h3>Error</h3>
-            <p>{error}</p>
-            <button className="btn btn-primary mt-3" onClick={() => navigate('/')}>
-              Return to Main Calendar
-            </button>
-          </div>
+        <div className="max-w-3xl mx-auto mt-8">
+          <Alert
+            message="Error"
+            description={error}
+            type="error"
+            showIcon
+          />
         </div>
       ) : (
-        <div className="laboratory-calendar">
-          <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="timeGridWeek"
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay'
-            }}
-            editable={true}
-            selectable={true}
-            selectMirror={true}
-            dayMaxEvents={true}
-            select={handleDateSelect}
-            eventClick={handleEventClick}
-            eventDrop={handleEventDrop}
-            eventRemove={handleEventRemove}
-            events={filteredEvents}
-            resources={resources}
-            height="auto"
-            slotMinTime="06:00:00" // Start calendar at 6am
-            allDaySlot={true}
-            allDayText="all-day"
-            weekends={showWeekends} // Control weekends visibility
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+          {/* Summary Stats */}
+          <Row gutter={16} className="mb-6">
+            <Col span={6}>
+              <Card>
+                <Statistic
+                  title="Total Reservations"
+                  value={filteredEvents.length}
+                  prefix={<CalendarOutlined />}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic
+                  title="Utilization"
+                  value={filteredEvents.filter(e => e.purpose === 'Utilization').length}
+                  suffix={`/${filteredEvents.length}`}
+                  valueStyle={{ color: '#4285F4' }}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic
+                  title="Maintenance"
+                  value={filteredEvents.filter(e => e.purpose === 'Maintenance').length}
+                  suffix={`/${filteredEvents.length}`}
+                  valueStyle={{ color: '#FBBC05' }}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic
+                  title="Broken/Repair"
+                  value={filteredEvents.filter(e => e.purpose === 'Broken').length}
+                  suffix={`/${filteredEvents.length}`}
+                  valueStyle={{ color: '#EA4335' }}
+                />
+              </Card>
+            </Col>
+          </Row>
+
+          {/* Filters Row */}
+          <Card className="mb-6">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center">
+                <span className="mr-2 text-gray-600">Equipment:</span>
+                <Select
+                  value={equipmentFilter}
+                  onChange={value => setEquipmentFilter(value)}
+                  style={{ width: 180 }}
+                >
+                  <Option value="all">All Equipment</Option>
+                  {uniqueEquipment.map(item => (
+                    <Option key={item} value={item}>{item}</Option>
+                  ))}
+                </Select>
+              </div>
+              
+              <div className="flex items-center">
+                <span className="mr-2 text-gray-600">Technician:</span>
+                <Select
+                  value={technicianFilter}
+                  onChange={value => setTechnicianFilter(value)}
+                  style={{ width: 180 }}
+                >
+                  <Option value="all">All Technicians</Option>
+                  {uniqueTechnicians.map(item => (
+                    <Option key={item} value={item}>{item}</Option>
+                  ))}
+                </Select>
+              </div>
+              
+              <div className="flex items-center">
+                <span className="mr-2 text-gray-600">Purpose:</span>
+                <Select
+                  value={purposeFilter}
+                  onChange={value => setPurposeFilter(value)}
+                  style={{ width: 150 }}
+                >
+                  <Option value="all">All Purposes</Option>
+                  <Option value="Utilization">Utilization</Option>
+                  <Option value="Maintenance">Maintenance</Option>
+                  <Option value="Broken">Broken</Option>
+                </Select>
+              </div>
+              
+              <div className="ml-auto flex space-x-2">
+                <Button 
+                  icon={<ReloadOutlined />} 
+                  onClick={resetFilters}
+                >
+                  Reset Filters
+                </Button>
+                <Button 
+                  icon={<FilterOutlined />}
+                  type={showWeekends ? "default" : "primary"}
+                  onClick={() => setShowWeekends(!showWeekends)}
+                >
+                  {showWeekends ? "Hide Weekends" : "Show Weekends"}
+                </Button>
+              </div>
+            </div>
             
-            // Filter by resource if resourceId is provided in URL
-            resourceId={resourceFilter}
-            
-            // Add this eventDataTransform function to handle both top-level and nested properties
-            eventDataTransform={(event) => {
-              // For handling the transition from nested to top-level properties
-              // This ensures both formats work
-              const transformedEvent = { ...event };
-              
-              // Initialize extendedProps if it doesn't exist
-              if (!transformedEvent.extendedProps) {
-                transformedEvent.extendedProps = {};
-              }
-              
-              // List of properties that might be at top level or in extendedProps
-              const propsToCheck = [
-                'location', 'equipment', 'technician', 'notes', 
-                'recordId', 'sampleType', 'reminders', 'eventLink',
-                'purpose', 'cost' // Add new fields
-              ];
-              
-              // Ensure all properties are accessible in both places
-              // This allows the event handler to check both locations
-              propsToCheck.forEach(prop => {
-                // Move top-level props to extendedProps for backward compatibility
-                if (transformedEvent[prop] !== undefined && 
-                    transformedEvent.extendedProps[prop] === undefined) {
-                  transformedEvent.extendedProps[prop] = transformedEvent[prop];
-                }
-                
-                // Also copy from extendedProps to top level for forward compatibility
-                if (transformedEvent.extendedProps[prop] !== undefined && 
-                    transformedEvent[prop] === undefined) {
-                  transformedEvent[prop] = transformedEvent.extendedProps[prop];
-                }
-              });
-              
-              // Add purpose-based CSS class
-              const purpose = transformedEvent.purpose || transformedEvent.extendedProps.purpose || 'Utilization';
-              transformedEvent.className = getPurposeClass(purpose);
-              
-              return transformedEvent;
-            }}
-          />
+            {/* Filter summary */}
+            {(equipmentFilter !== 'all' || technicianFilter !== 'all' || purposeFilter !== 'all') && (
+              <div className="mt-3 text-sm text-gray-500">
+                Showing {filteredEvents.length} of {events.length} events
+                {equipmentFilter !== 'all' && ` • Equipment: ${equipmentFilter}`}
+                {technicianFilter !== 'all' && ` • Technician: ${technicianFilter}`}
+                {purposeFilter !== 'all' && ` • Purpose: ${purposeFilter}`}
+              </div>
+            )}
+          </Card>
+
+          {/* Calendar Legend */}
+          <div className="mb-4 flex items-center space-x-4">
+            <div className="text-gray-700 font-medium">Event Types:</div>
+            {getPurposeLabel('Utilization')}
+            {getPurposeLabel('Maintenance')}
+            {getPurposeLabel('Broken')}
+          </div>
+
+          {/* Main Calendar */}
+          <Card>
+            <Calendar 
+              dateCellRender={dateCellRender}
+              value={currentDate}
+              onChange={date => setCurrentDate(date.toDate())}
+              onSelect={date => setSelectedDate(date.toDate())}
+            />
+          </Card>
+
+          {/* Selected Day Detail View */}
+          {selectedDate && (
+            <Card className="mt-6" title={`Events for ${selectedDate.toDateString()}`}>
+              {getEventsForDate(selectedDate).length > 0 ? (
+                <div className="space-y-4">
+                  {getEventsForDate(selectedDate).map(event => (
+                    <div key={event.id} className="border-l-4 pl-4 py-2" style={{ borderColor: event.purpose === 'Maintenance' ? '#FBBC05' : event.purpose === 'Broken' ? '#EA4335' : '#4285F4' }}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="text-lg font-medium">{event.title}</h3>
+                          <p className="text-gray-500">
+                            {new Date(event.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
+                            {new Date(event.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        <div>
+                          {getPurposeLabel(event.purpose)}
+                        </div>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                        <div><span className="text-gray-500">Equipment:</span> {event.equipment}</div>
+                        <div><span className="text-gray-500">Technician:</span> {event.technician}</div>
+                        <div><span className="text-gray-500">Cost:</span> ${event.cost}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No events scheduled for this day
+                </div>
+              )}
+            </Card>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-export default TenantCalendar;
+export default EnhancedCalendar;
