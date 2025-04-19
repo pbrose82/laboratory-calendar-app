@@ -9,6 +9,7 @@ import {
   CheckCircleOutlined, ExclamationOutlined, CloseCircleOutlined
 } from '@ant-design/icons';
 import { fetchTenant } from '../services/apiClient';
+import { fetchTenantWithDemo } from '../services/demoTenantHelper';
 import './ResourceViews.css';
 
 const { Option } = Select;
@@ -43,16 +44,11 @@ function EquipmentList() {
         setTenantName('Product CASE UAT');
       }
       
-      // Normal tenant handling from API
-      const tenantData = await fetchTenant(tenantId);
+      // Use enhanced fetch that handles demo tenant
+      const tenantData = await fetchTenantWithDemo(tenantId, fetchTenant);
       
       if (tenantData && isMounted.current) {
-        // Get resources from API 
-        let resourcesList = [...(tenantData.resources || [])];
-        
-      setResources(tenantData.resources || []);
-        
-        setResources(resourcesList);
+        setResources(tenantData.resources || []);
         setEvents(tenantData.events || []);
         
         if (!tenantName) {
