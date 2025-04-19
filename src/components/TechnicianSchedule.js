@@ -382,3 +382,26 @@ function TechnicianSchedule() {
                         {event.location && (
                           <div>
                             <EnvironmentOutlined style={{ marginRight: 8 }} />
+                            <Text>{event.location}</Text>
+                          </div>
+                        )}
+                        
+                        {event.notes && (
+                          <div className="event-notes">
+                            <Text type="secondary">{event.notes}</Text>
+                          </div>
+                        )}
+                      </Space>
+                    </Card>
+                  </Timeline.Item>
+                ))}
+              </Timeline>
+            )}
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default TechnicianSchedule;
