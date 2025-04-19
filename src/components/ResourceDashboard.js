@@ -10,6 +10,7 @@ import {
   BarChartOutlined, PlayCircleOutlined
 } from '@ant-design/icons';
 import { fetchTenant } from '../services/apiClient';
+import { fetchTenantWithDemo } from '../services/demoTenantHelper';
 import './ResourceViews.css';
 
 const { Title, Text } = Typography;
@@ -38,16 +39,12 @@ function ResourceDashboard() {
         setTenantName('Product CASE UAT');
       }
       
-      // Normal tenant handling from API
-      const tenantData = await fetchTenant(tenantId);
+      // Use enhanced fetch function that handles demo tenant
+      const tenantData = await fetchTenantWithDemo(tenantId, fetchTenant);
       
       if (tenantData && isMounted.current) {
-        // Get resources from API 
-        let resourcesList = [...(tenantData.resources || [])];
-        
+        // Get resources from API or demo data
         setResources(tenantData.resources || []);
-        
-        setResources(resourcesList);
         setEvents(tenantData.events || []);
         
         if (!tenantName) {
