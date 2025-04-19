@@ -50,9 +50,11 @@ function CapacityPlanning() {
       // Special handling for tenant name
       if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
         setTenantName('Product CASE UAT');
+      } else if (tenantId === 'Demo') {
+        setTenantName('Demo');
       }
 
-      // Load data from API
+      // Load data from API with special handling for Demo tenant
       const tenantData = await fetchTenant(tenantId);
 
       if (tenantData && isMounted.current) {
@@ -227,10 +229,8 @@ function CapacityPlanning() {
         slots.push(start); // Fallback or error handling
     }
 
-    // Convert dayjs objects back to Date objects if needed later, or process as dayjs objects
-    // For compatibility with existing code that might expect Date objects:
-    return slots; // Keep as dayjs objects for calculations
-    // return slots.map(slot => slot.toDate()); // Convert to Date objects if necessary for other parts
+    // Keep as dayjs objects for calculations
+    return slots; 
   };
 
   // Main function to calculate capacity data
@@ -501,7 +501,7 @@ function CapacityPlanning() {
 
   // Format display name for tenant
   const getDisplayName = () => {
-    if (tenantId === 'demo-tenant') {
+    if (tenantId === 'demo-tenant' || tenantId === 'Demo') {
       return 'Demo Tenant';
     } else if (tenantId === 'productcaseelnlims4uat' || tenantId === 'productcaseelnandlims') {
       return 'Product CASE UAT';
